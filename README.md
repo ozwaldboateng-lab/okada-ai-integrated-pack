@@ -64,6 +64,7 @@ pytest apps/okada-kernel-service/tests/test_kernel_acceptance.py -q
 - `ops/`: deployment and environment examples
 - `docs/53_operator_demo_flow.md`: start-here operator walkthrough for the unified gateway demo
 - `docs/94_completion_status_and_windows_runbook.md`: completion status, Windows PowerShell commands, and remaining validation checklist
+- `docs/95_project_overview_ja.md`: Japanese overview for third-party explanation
 
 ## Latest packaged variants
 - v0.7 adds Dify-first detailed runtime integration assets.
