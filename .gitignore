@@ -1,0 +1,36 @@
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Local environments and secrets
+.venv/
+venv/
+.env
+ops/integrated/.env
+ops/litellm/.env
+ops/dify/.env
+ops/langgraph/.env
+ops/openwebui/.env
+
+# Runtime/generated data
+data/audit/*.jsonl
+apps/okada-kernel-service/data/audit/*.jsonl
+data/benchmarks/e2e_summary.json
+data/auto_calibration/*.json
+data/auto_calibration/*.jsonl
+data/auto_calibration/lab_reports/
+apps/okada-kernel-service/data/auto_calibration/*.json
+apps/okada-kernel-service/data/auto_calibration/*.jsonl
+apps/okada-kernel-service/data/auto_calibration/lab_reports/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
