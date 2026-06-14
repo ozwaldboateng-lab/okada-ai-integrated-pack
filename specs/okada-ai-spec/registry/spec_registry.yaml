@@ -1,0 +1,95 @@
+version: "0.2"
+status: Draft
+date: "2026-04-17"
+source_of_truth:
+  registry: registry/
+  docs: docs/
+  api: api/
+  schemas: schemas/
+read_order:
+  - docs/00_overview_design.md
+  - docs/10_detailed_design_index.md
+  - registry/core/okd-ai-core-001.yaml
+  - registry/adapters/okd-ai-001-monitoring.yaml
+  - registry/adapters/okd-ai-002-drift.yaml
+  - registry/adapters/okd-ai-003-agent.yaml
+  - registry/adapters/okd-ai-004-rag.yaml
+  - registry/adapters/okd-ai-005-routing.yaml
+specs:
+  - id: OKD-AI-CORE-001
+    name: Okada Governance Kernel
+    wave: core
+    status: Ready for detailed implementation
+    owner: core
+    file: registry/core/okd-ai-core-001.yaml
+  - id: OKD-AI-001
+    name: Post-deployment Monitoring / Trust Window Governance
+    wave: first
+    status: Ready for detailed implementation
+    owner: monitoring
+    file: registry/adapters/okd-ai-001-monitoring.yaml
+  - id: OKD-AI-002
+    name: MLOps Concept Drift Thresholding
+    wave: first
+    status: Ready for detailed implementation
+    owner: mlops
+    file: registry/adapters/okd-ai-002-drift.yaml
+  - id: OKD-AI-003
+    name: Agentic AI Route Contamination and Escalation Governance
+    wave: first
+    status: Ready for detailed implementation
+    owner: agent
+    file: registry/adapters/okd-ai-003-agent.yaml
+  - id: OKD-AI-004
+    name: RAG Freshness / Context Contamination Governance
+    wave: first
+    status: Ready for detailed implementation
+    owner: rag
+    file: registry/adapters/okd-ai-004-rag.yaml
+  - id: OKD-AI-005
+    name: Multi-model / Multi-strategy Routing Governance
+    wave: first
+    status: Ready for detailed implementation
+    owner: routing
+    file: registry/adapters/okd-ai-005-routing.yaml
+  - id: OKD-AI-006
+    name: Industrial Time-series Anomaly Warning Layer
+    wave: second
+    status: Draft
+    owner: anomaly
+  - id: OKD-AI-007
+    name: Root-cause Prioritization Pre-layer
+    wave: second
+    status: Draft
+    owner: rca
+  - id: OKD-AI-008
+    name: Evaluation Contamination / Judge Leakage Auditor
+    wave: second
+    status: Draft
+    owner: eval
+  - id: OKD-AI-009
+    name: Inference-era Datacenter Energy / Latency Governance
+    wave: second
+    status: Draft
+    owner: infra
+  - id: OKD-AI-010
+    name: Drift-aware Intrusion Detection Governance
+    wave: hold
+    status: Hold
+    owner: security
+  - id: OKD-AI-011
+    name: Quantum Optimization Diagnosis-driven Governance
+    wave: second
+    status: Draft
+    owner: quantum
+  - id: OKD-AI-012
+    name: Mitigation-to-Correction Handoff Governance
+    wave: hold
+    status: Hold
+    owner: quantum
+rules:
+  - Each spec must define baselines.
+  - Each spec must define evaluation metrics.
+  - Each spec must define minimum viable implementation.
+  - Do not use "万能" or "全解決" as requirement language.
+  - Registry YAML is the source of truth when docs conflict.

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FixtureSuiteBuildRequest",
+  "type": "object",
+  "required": ["profile_name", "spec_id", "adapter_type"],
+  "properties": {
+    "profile_name": {"type": "string"},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "suite_name": {"type": ["string", "null"]},
+    "description": {"type": "string"},
+    "window_records": {"type": "array"},
+    "use_recent_audits": {"type": "boolean"},
+    "audit_limit": {"type": "integer", "minimum": 1},
+    "window_request": {"type": ["object", "null"]},
+    "max_cases": {"type": "integer", "minimum": 1},
+    "strategy": {"enum": ["recent", "success_weighted", "failure_weighted"]},
+    "use_current_policy_baseline": {"type": "boolean"},
+    "include_only_expected_action": {"type": "boolean"},
+    "overwrite": {"type": "boolean"},
+    "persist_suite": {"type": "boolean"}
+  }
+}

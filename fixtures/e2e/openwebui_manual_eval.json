@@ -1,0 +1,42 @@
+{
+  "workflow_id": "openwebui-route-and-audit-manual-eval",
+  "source_fixtures": [
+    "fixtures/e2e/routing_cases.jsonl",
+    "fixtures/e2e/rag_cases.jsonl"
+  ],
+  "expected_artifacts": [
+    "data/audit/audit_records.jsonl",
+    "data/benchmarks/e2e_summary.json",
+    "examples/openwebui/operator_console_contract.md"
+  ],
+  "cases": [
+    {
+      "case_id": "owui-routing-strong-promotion",
+      "fixture_id": "routing-hard-high-risk",
+      "adapter_type": "routing",
+      "screen": "Open WebUI chat with Okada Governance Pipe",
+      "expected_visible_fields": [
+        "selected_model",
+        "okada_action",
+        "okada_regime",
+        "okada_audit_trace_id"
+      ],
+      "expected_action": "promote_strong_model",
+      "expected_artifact": "data/audit/audit_records.jsonl"
+    },
+    {
+      "case_id": "owui-rag-abstain-audit-review",
+      "fixture_id": "rag-stale-conflict",
+      "adapter_type": "rag",
+      "screen": "Operator audit review from E2E summary",
+      "expected_visible_fields": [
+        "scenario_id",
+        "okada_action",
+        "regime",
+        "type_class"
+      ],
+      "expected_action": "abstain",
+      "expected_artifact": "data/benchmarks/e2e_summary.json"
+    }
+  ]
+}

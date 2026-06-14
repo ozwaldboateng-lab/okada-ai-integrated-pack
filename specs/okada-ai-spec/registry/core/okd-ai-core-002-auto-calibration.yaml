@@ -1,0 +1,65 @@
+spec_id: OKD-AI-CORE-002
+name: Auto-Calibration Manager
+status: draft
+purpose: >-
+  Recalculate threshold and weight candidates from recent logs, validate them
+  against replay/fixtures, and only adopt them when safety conditions pass.
+scope:
+  adapters:
+    - monitoring
+    - drift
+    - rag
+    - routing
+    - agent
+  parameter_classes:
+    - thresholds
+    - weights
+    - bonuses
+    - penalties
+non_goals:
+  - retrain_foundation_models
+  - replace_base_detectors
+  - discover_new_feature_semantics
+  - disable_hard_safety_guards
+components:
+  - log_window_builder
+  - candidate_generator
+  - replay_validator
+  - adoption_gate
+  - config_publisher
+lifecycle:
+  - collect_window
+  - generate_candidate
+  - replay_validate
+  - gate_decision
+  - publish_or_reject
+  - post_adoption_monitoring
+  - rollback_if_needed
+common_inputs:
+  - adapter_type
+  - current_config
+  - log_window
+  - replay_cases
+  - policy_profile
+common_outputs:
+  - candidate_config
+  - validation_report
+  - adoption_decision
+  - rollback_policy
+  - calibration_audit_record
+modes:
+  - suggest_only
+  - approval_gated
+  - shadow_challenger
+  - guarded_auto_adopt
+safety_requirements:
+  - no_catastrophic_degradation
+  - bounded_success_drop
+  - bounded_latency_cost_drift
+  - bounded_abstain_handoff_spike
+  - bounded_config_delta
+source_of_truth_priority:
+  - registry/core/okd-ai-core-002-auto-calibration.yaml
+  - registry/policies/auto_calibration_profiles.yaml
+  - api/okada-auto-calibration.openapi.yaml
+  - schemas/auto-calibration-*.json

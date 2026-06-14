@@ -1,0 +1,45 @@
+{
+  "rag_default": {
+    "metadata": {
+      "adapter_type": "rag",
+      "mode": "shadow_challenger",
+      "revision_id": "922d3271-011a-429b-84b0-1284c62eb42b",
+      "spec_id": "OKD-AI-004"
+    },
+    "preferred_actions": {},
+    "profile_name": "rag_default",
+    "thresholds": {
+      "T_clean": 0.5854,
+      "T_contam": 1.0639,
+      "abstain_threshold": 0.5463,
+      "freshness_threshold": 0.4263,
+      "high_risk_bonus": 0.15
+    },
+    "weights": {
+      "W_comp": 0.5525,
+      "W_dom": 1.7049,
+      "W_hist": 1.1537
+    }
+  },
+  "routing_default": {
+    "metadata": {
+      "adapter_type": "routing",
+      "mode": "guarded_auto_adopt",
+      "revision_id": "10c8eac1-fa14-45d8-896b-b45724c26fa3",
+      "spec_id": "OKD-AI-005"
+    },
+    "preferred_actions": {},
+    "profile_name": "routing_default",
+    "thresholds": {
+      "T_clean": 0.4946,
+      "T_contam": 0.8198,
+      "high_risk_bonus": 0.15,
+      "promotion_threshold": 0.7628
+    },
+    "weights": {
+      "W_comp": 1.0748,
+      "W_dom": 1.5865,
+      "W_hist": 0.5
+    }
+  }
+}

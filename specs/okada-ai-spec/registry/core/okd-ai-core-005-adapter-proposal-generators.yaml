@@ -1,0 +1,26 @@
+spec_id: OKD-AI-CORE-005
+name: Adapter Proposal Generators
+status: draft
+purpose: >-
+  Convert adapter metric summaries into adapter-specific threshold and weight proposals
+  before validation and adoption.
+inputs:
+  - calibration_summary
+  - current_policy
+  - profile_catalog_entry
+  - max_delta_constraint
+outputs:
+  - proposed_threshold_updates
+  - proposed_weight_updates
+  - strategy_notes
+  - strategy_name
+adapters:
+  - routing
+  - rag
+  - monitoring
+  - drift
+  - agent
+constraints:
+  - proposal_only
+  - validation_required
+  - adoption_gate_required

@@ -1,0 +1,22 @@
+spec_id: OKD-AI-CORE-007
+name: Lab-aware Validation and Champion-Challenger Gating
+status: draft
+layer: core
+purpose: >-
+  Integrate calibration-lab replay results directly into validation and shadow challenger
+  eligibility decisions.
+inputs:
+  - auto-calibration validation request
+  - optional lab suite name
+  - optional persist_lab_report flag
+outputs:
+  - validation response with lab summary and report references
+  - champion candidate state enriched with latest lab replay references
+adoption_gates:
+  optional_keys:
+    - min_lab_gain_vs_current
+    - min_lab_preferred_match_delta
+    - require_lab_non_negative
+notes:
+  - live/recent window metrics remain primary
+  - lab replay acts as replay-based guardrail

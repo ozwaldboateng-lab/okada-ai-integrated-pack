@@ -1,0 +1,22 @@
+spec_id: OKD-AI-CORE-008
+name: Scheduler Lab Gate
+status: draft
+purpose: >-
+  Allow auto-calibration scheduler plans to automatically run calibration lab replay suites
+  as a guardrail during validation and champion/challenger preparation.
+inputs:
+  - scheduler plan
+  - profile_name
+  - spec_id
+  - adapter_type
+  - optional explicit lab_suite_name
+outputs:
+  - lab_executed
+  - lab_suite_name
+  - lab_report_id
+  - lab_gain_vs_current
+rules:
+  - explicit suite name takes priority
+  - otherwise resolve suite by exact match on profile/spec/adapter
+  - otherwise resolve first suite matching adapter_type
+  - if require_lab_gate is true and no suite executes, adoption must not be recommended

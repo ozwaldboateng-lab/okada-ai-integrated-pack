@@ -1,0 +1,51 @@
+[
+  {
+    "scenario_id": "litellm-cheap-clean",
+    "payload": {
+      "model": "cheap-default",
+      "messages": [{"role": "user", "content": "Summarize this short note."}],
+      "metadata": {
+        "complexity_proxy": 0.1,
+        "historical_route_success": 0.95,
+        "budget_remaining": 0.9,
+        "latency_load_state": 0.1,
+        "risk_class": "standard"
+      }
+    },
+    "expected_action": "cheap_route",
+    "expected_model": "cheap-default"
+  },
+  {
+    "scenario_id": "litellm-bounded-hybrid",
+    "payload": {
+      "model": "cheap-default",
+      "messages": [{"role": "user", "content": "Compare two policies and cite likely caveats."}],
+      "metadata": {
+        "complexity_proxy": 0.8,
+        "historical_route_success": 0.75,
+        "budget_remaining": 0.7,
+        "latency_load_state": 0.4,
+        "risk_class": "standard"
+      }
+    },
+    "expected_action": "bounded_hybrid",
+    "expected_model": "strong-default"
+  },
+  {
+    "scenario_id": "litellm-promote-strong",
+    "payload": {
+      "model": "cheap-default",
+      "messages": [{"role": "user", "content": "Give a high-risk answer with operational consequences."}],
+      "metadata": {
+        "complexity_proxy": 1.0,
+        "historical_route_success": 0.0,
+        "budget_remaining": 0.0,
+        "latency_load_state": 0.9,
+        "risk_class": "high",
+        "retrieval_need_estimate": 1.0
+      }
+    },
+    "expected_action": "promote_strong_model",
+    "expected_model": "strong-default"
+  }
+]

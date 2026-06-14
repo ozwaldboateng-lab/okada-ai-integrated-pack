@@ -1,0 +1,71 @@
+spec_id: OKD-AI-CORE-001
+name: Okada Governance Kernel
+version: "0.2"
+status: Ready for detailed implementation
+purpose: >
+  全 adapter が共有する岡田理論の診断・統御カーネルを提供する。
+non_goals:
+  - 新規 detector の代替
+  - 基盤モデル学習
+  - 自動閾値最適化
+interfaces:
+  endpoints:
+    - /okada/diagnose
+    - /okada/route
+    - /okada/intervene
+    - /okada/audit
+  adapter_contract:
+    - validate_observables
+    - normalize
+    - derive_features
+    - classify
+    - candidate_actions
+    - build_audit
+required_request_fields:
+  - spec_id
+  - adapter_type
+  - observables
+  - context
+  - history_state
+  - resource_state
+required_derived_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - R_diag
+  - S_trust
+  - regime_hint
+  - type_hint
+core_formulas:
+  R_diag: (W_hist * abs(H_hist) + W_comp * abs(H_comp)) / (W_dom * abs(H_dom) + eps)
+regime_logic:
+  clean: H_dom >= T_dom_min and R_diag < T_clean_max
+  mixed: H_dom >= T_dom_survive and R_diag < T_contam_min
+  contaminated: otherwise
+common_actions:
+  - continue
+  - watch
+  - reroute
+  - deepen
+  - fallback
+  - restrict
+  - retrain
+  - rollback
+  - escalate
+  - human_handoff
+  - abstain
+audit_required_fields:
+  - audit_trace_id
+  - timestamp
+  - raw_inputs
+  - normalized_inputs
+  - derived_features
+  - decision
+  - recommended_action
+  - alternatives
+  - policy_snapshot
+implementation_notes:
+  - Kernel is shared external service.
+  - Thresholds and weights must remain configurable.
+  - Deterministic mode must be supported.

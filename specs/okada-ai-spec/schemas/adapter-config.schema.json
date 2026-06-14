@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AdapterConfig",
+  "type": "object",
+  "required": [
+    "spec_id",
+    "adapter_type",
+    "required_observables"
+  ],
+  "properties": {
+    "spec_id": {
+      "type": "string"
+    },
+    "adapter_type": {
+      "type": "string"
+    },
+    "required_observables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "optional_observables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "oss_targets": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

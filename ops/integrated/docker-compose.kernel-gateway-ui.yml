@@ -1,0 +1,69 @@
+version: "3.9"
+
+# Preferred integrated startup path.
+# Run from repo root:
+# docker compose -f ops/integrated/docker-compose.kernel-gateway-ui.yml --env-file ops/integrated/.env up -d
+services:
+  okada-kernel-service:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ../../:/app
+    command: >
+      bash -lc "pip install -e .[dev] && uvicorn app.main:app --app-dir apps/okada-kernel-service --host 0.0.0.0 --port 8080"
+    environment:
+      OKADA_AUDIT_DIR: /app/data/audit
+      OKADA_AUDIT_BACKEND: jsonl
+      OKADA_DEFAULT_POLICY: default
+      OKADA_SHARED_TOKEN: ${OKADA_SHARED_TOKEN:-}
+    ports:
+      - "${OKADA_KERNEL_PORT:-8080}:8080"
+
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    depends_on:
+      - okada-kernel-service
+    volumes:
+      - ../../:/app
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app/apps/okada-kernel-service
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      OKADA_BASE_URL: ${OKADA_BASE_URL:-http://okada-kernel-service:8080}
+      OKADA_SHARED_TOKEN: ${OKADA_SHARED_TOKEN:-}
+      OKADA_ROUTE_MAP_PATH: /app/examples/litellm/route_map.json
+      CHEAP_MODEL_NAME: ${CHEAP_MODEL_NAME:-openai/gpt-4o-mini}
+      STRONG_MODEL_NAME: ${STRONG_MODEL_NAME:-openai/gpt-4.1}
+    command: >
+      sh -lc "python /app/scripts/render_litellm_config.py --template /app/examples/litellm/proxy_config.template.yaml --route-map /app/examples/litellm/route_map.json --output /tmp/proxy_config.yaml && litellm --config /tmp/proxy_config.yaml --port ${LITELLM_PORT:-4000}"
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      - litellm-proxy
+      - okada-kernel-service
+    environment:
+      OPENAI_API_BASE_URL: http://litellm-proxy:${LITELLM_PORT:-4000}/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-}
+      WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY:-replace-me}
+      OKADA_BASE_URL: ${OKADA_BASE_URL:-http://okada-kernel-service:8080}
+      OKADA_SHARED_TOKEN: ${OKADA_SHARED_TOKEN:-}
+      OPENWEBUI_OKADA_CHEAP_MODEL_ID: ${OPENWEBUI_OKADA_CHEAP_MODEL_ID:-gpt-4o-mini}
+      OPENWEBUI_OKADA_STRONG_MODEL_ID: ${OPENWEBUI_OKADA_STRONG_MODEL_ID:-gpt-4.1}
+      OPENWEBUI_OKADA_BLOCK_ON_CONTAMINATED: ${OPENWEBUI_OKADA_BLOCK_ON_CONTAMINATED:-false}
+    ports:
+      - "${OPENWEBUI_PORT:-3000}:8080"
+
+  benchmark-runner:
+    image: python:3.11-slim
+    depends_on:
+      - okada-kernel-service
+    working_dir: /app
+    volumes:
+      - ../../:/app
+    command: >
+      bash -lc "pip install -e .[dev] && python scripts/e2e_compare.py --output data/benchmarks/e2e_summary.json --pretty"
+    profiles: ["benchmark"]

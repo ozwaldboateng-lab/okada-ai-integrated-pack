@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AdapterMetricSummaryRequest",
+  "type": "object",
+  "required": ["spec_id", "adapter_type"],
+  "properties": {
+    "profile_name": {"type": ["string", "null"]},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "window_records": {"type": "array"},
+    "use_recent_audits": {"type": "boolean"},
+    "audit_limit": {"type": "integer", "minimum": 1},
+    "include_records": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

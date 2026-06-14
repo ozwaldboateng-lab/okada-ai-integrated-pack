@@ -1,0 +1,21 @@
+{
+  "spec_id": "OKD-AI-003",
+  "adapter_type": "agent",
+  "observables": {
+    "planner_executor_mismatch": 0.76,
+    "tool_disagreement": 0.68,
+    "retry_count": 3,
+    "unresolved_subgoal_count": 2,
+    "route_split_frequency": 0.58
+  },
+  "context": {
+    "user_request": "Prepare and submit the vendor change request",
+    "plan": "search -> draft -> submit"
+  },
+  "history_state": {},
+  "resource_state": {},
+  "policy_profile": {
+    "profile_name": "default",
+    "deterministic_mode": true
+  }
+}

@@ -1,0 +1,81 @@
+[
+  {
+    "scenario_id": "resume-approve",
+    "thread_id": "demo-thread-approve",
+    "interrupted_state": {
+      "thread_id": "demo-thread-approve",
+      "checkpoint_id": "checkpoint-approve-1",
+      "run_id": "run-approve-1",
+      "governance_action": "human_handoff",
+      "governance_regime": "contaminated",
+      "requires_interrupt": true,
+      "audit_trace_id": "trace-approve",
+      "tool_name": "read_only_search",
+      "tool_policy": {"allow": ["read_only_search"], "disable": ["wiki_write"]}
+    },
+    "human_review": {
+      "action": "continue",
+      "notes": "Approved after confirming read-only scope.",
+      "reviewer_id": "operator-1"
+    },
+    "expected": {
+      "governance_action": "continue",
+      "allow_continue": true,
+      "requires_interrupt": false,
+      "should_abort": false
+    }
+  },
+  {
+    "scenario_id": "resume-edit",
+    "thread_id": "demo-thread-edit",
+    "interrupted_state": {
+      "thread_id": "demo-thread-edit",
+      "checkpoint_id": "checkpoint-edit-1",
+      "run_id": "run-edit-1",
+      "governance_action": "human_handoff",
+      "governance_regime": "mixed",
+      "requires_interrupt": true,
+      "audit_trace_id": "trace-edit",
+      "tool_name": "wiki_write",
+      "tool_policy": {"allow": [], "disable": ["wiki_write"]}
+    },
+    "human_review": {
+      "action": "constrained_continue",
+      "notes": "Edit to read-only evidence gathering.",
+      "approved_tool_subset": ["read_only_search"],
+      "reviewer_id": "operator-1"
+    },
+    "expected": {
+      "governance_action": "constrained_continue",
+      "allow_continue": true,
+      "requires_interrupt": false,
+      "should_abort": false
+    }
+  },
+  {
+    "scenario_id": "resume-abort",
+    "thread_id": "demo-thread-abort",
+    "interrupted_state": {
+      "thread_id": "demo-thread-abort",
+      "checkpoint_id": "checkpoint-abort-1",
+      "run_id": "run-abort-1",
+      "governance_action": "human_handoff",
+      "governance_regime": "contaminated",
+      "requires_interrupt": true,
+      "audit_trace_id": "trace-abort",
+      "tool_name": "mail_send",
+      "tool_policy": {"allow": [], "disable": ["mail_send"]}
+    },
+    "human_review": {
+      "action": "abort",
+      "notes": "Unsafe external side effect.",
+      "reviewer_id": "operator-1"
+    },
+    "expected": {
+      "governance_action": "abort",
+      "allow_continue": false,
+      "requires_interrupt": false,
+      "should_abort": true
+    }
+  }
+]

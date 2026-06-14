@@ -1,0 +1,38 @@
+suites:
+  generated_routing_build_history:
+    adapter_type: routing
+    case_count: 2
+    description: Generated from routing logs
+    file: generated/generated_routing_build_history.jsonl
+    generated: true
+    profile_name: routing_default
+    spec_id: OKD-AI-005
+  generated_routing_builder_smoke:
+    adapter_type: routing
+    case_count: 2
+    description: Generated from routing logs
+    file: generated/generated_routing_builder_smoke.jsonl
+    generated: true
+    profile_name: routing_default
+    spec_id: OKD-AI-005
+  generated_routing_replay_smoke:
+    adapter_type: routing
+    case_count: 2
+    description: Generated from routing logs
+    file: generated/generated_routing_replay_smoke.jsonl
+    generated: true
+    profile_name: routing_default
+    spec_id: OKD-AI-005
+  rag_replay_smoke:
+    adapter_type: rag
+    description: RAG replay smoke suite for freshness/conflict governance.
+    file: rag_replay_smoke.jsonl
+    profile_name: rag_default
+    spec_id: OKD-AI-004
+  routing_replay_smoke:
+    adapter_type: routing
+    description: Routing replay smoke suite based on baseline vs preferred routing
+      actions.
+    file: routing_replay_smoke.jsonl
+    profile_name: routing_default
+    spec_id: OKD-AI-005

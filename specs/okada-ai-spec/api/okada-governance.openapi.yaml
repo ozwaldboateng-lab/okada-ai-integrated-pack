@@ -1,0 +1,241 @@
+openapi: 3.1.0
+info:
+  title: Okada Governance API
+  version: "0.2"
+  description: >
+    岡田理論に基づく診断・統御カーネル API。
+servers:
+  - url: http://localhost:8080
+paths:
+  /okada/diagnose:
+    post:
+      summary: Diagnose regime and recommend an action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnoseRequest'
+      responses:
+        '200':
+          description: Diagnosis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnoseResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /okada/route:
+    post:
+      summary: Select a route among candidates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnoseRequest'
+      responses:
+        '200':
+          description: Route decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnoseResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /okada/intervene:
+    post:
+      summary: Apply policy profile and return final intervention
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnoseRequest'
+      responses:
+        '200':
+          description: Intervention decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnoseResponse'
+  /okada/audit:
+    post:
+      summary: Create an audit record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRecord'
+      responses:
+        '200':
+          description: Audit record stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecord'
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+components:
+  schemas:
+    DiagnoseRequest:
+      type: object
+      required:
+        - spec_id
+        - adapter_type
+        - observables
+        - context
+        - history_state
+        - resource_state
+      properties:
+        spec_id:
+          type: string
+          enum: [OKD-AI-CORE-001, OKD-AI-001, OKD-AI-002, OKD-AI-003, OKD-AI-004, OKD-AI-005]
+        adapter_type:
+          type: string
+          enum: [monitoring, mlops, agent, rag, routing, anomaly, rca, eval, infra, security, quantum]
+        observables:
+          type: object
+          additionalProperties: true
+        context:
+          type: object
+          additionalProperties: true
+        history_state:
+          type: object
+          additionalProperties: true
+        resource_state:
+          type: object
+          additionalProperties: true
+        policy_profile:
+          $ref: '#/components/schemas/PolicyProfile'
+        counterfactual_candidates:
+          type: array
+          items:
+            type: string
+    DiagnoseResponse:
+      type: object
+      required:
+        - spec_id
+        - regime
+        - type_class
+        - scores
+        - first_visible_handle
+        - recommended_action
+        - audit_trace_id
+      properties:
+        spec_id:
+          type: string
+        regime:
+          type: string
+          enum: [clean, mixed, contaminated]
+        type_class:
+          type: string
+          enum: [I, II, III, undefined]
+        trust_state:
+          type: string
+          enum: [safe, caution, unsafe, undefined]
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+        first_visible_handle:
+          type: array
+          items:
+            type: string
+        recommended_action:
+          type: string
+        alternatives:
+          type: array
+          items:
+            type: string
+        audit_trace_id:
+          type: string
+        audit_persisted:
+          type: boolean
+    PolicyProfile:
+      type: object
+      properties:
+        profile_name:
+          type: string
+        deterministic_mode:
+          type: boolean
+        thresholds:
+          type: object
+          additionalProperties:
+            type: number
+        weights:
+          type: object
+          additionalProperties:
+            type: number
+        preferred_actions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    AuditRecord:
+      type: object
+      required:
+        - audit_trace_id
+        - timestamp
+        - spec_id
+        - adapter_type
+        - raw_inputs
+        - normalized_inputs
+        - derived_features
+        - decision
+      properties:
+        audit_trace_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        spec_id:
+          type: string
+        adapter_type:
+          type: string
+        raw_inputs:
+          type: object
+          additionalProperties: true
+        normalized_inputs:
+          type: object
+          additionalProperties: true
+        derived_features:
+          type: object
+          additionalProperties: true
+        decision:
+          type: object
+          additionalProperties: true
+        alternatives:
+          type: array
+          items:
+            type: string
+        policy_snapshot:
+          type: object
+          additionalProperties: true
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

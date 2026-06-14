@@ -1,0 +1,22 @@
+{
+  "cheap_route": {
+    "target_model": "cheap-default",
+    "strategy": "single_pass"
+  },
+  "continue": {
+    "target_model": "cheap-default",
+    "strategy": "single_pass"
+  },
+  "promote_strong_model": {
+    "target_model": "strong-default",
+    "strategy": "single_pass"
+  },
+  "bounded_hybrid": {
+    "target_model": "strong-default",
+    "strategy": "bounded_hybrid"
+  },
+  "branchwise_hybrid": {
+    "target_model": "strong-default",
+    "strategy": "branchwise_hybrid"
+  }
+}

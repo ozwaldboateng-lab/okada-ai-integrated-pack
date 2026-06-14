@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: Okada Fixture Suite Builder API
+  version: 0.1.0
+paths:
+  /okada/auto-calibration/lab/build-suite:
+    post:
+      summary: Build a generated calibration lab suite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/fixture-suite-build-request.schema.json
+      responses:
+        '200':
+          description: Generated suite metadata
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/fixture-suite-build-response.schema.json
+  /okada/auto-calibration/lab/build-history:
+    get:
+      summary: List suite build history
+      responses:
+        '200':
+          description: Build history records

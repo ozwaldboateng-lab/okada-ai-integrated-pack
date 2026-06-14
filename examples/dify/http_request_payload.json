@@ -1,0 +1,28 @@
+{
+  "spec_id": "OKD-AI-004",
+  "adapter_type": "rag",
+  "observables": {
+    "retrieval_score_distribution": "{{build_observables.retrieval_score_distribution}}",
+    "source_freshness": "{{build_observables.source_freshness}}",
+    "chunk_conflict_rate": "{{build_observables.chunk_conflict_rate}}",
+    "grounding_confidence": "{{build_observables.grounding_confidence}}",
+    "index_age": "{{build_observables.index_age}}"
+  },
+  "context": {
+    "question": "{{start.user_query}}",
+    "question_time_sensitivity": "{{build_observables.question_time_sensitivity}}",
+    "source_of_truth_flag": "{{build_observables.source_of_truth_flag}}"
+  },
+  "history_state": {
+    "recent_failures": "{{build_observables.recent_failures}}",
+    "stale_hits": "{{build_observables.stale_hits}}"
+  },
+  "resource_state": {
+    "budget_remaining": "{{build_observables.budget_remaining}}",
+    "latency_budget_ms": "{{build_observables.latency_budget_ms}}"
+  },
+  "policy_profile": {
+    "profile_name": "default",
+    "deterministic_mode": true
+  }
+}

@@ -1,0 +1,53 @@
+version: '0.3'
+components:
+- name: okada.api
+  type: service
+  depends_on:
+  - okada.core
+  - okada.audit
+  - okada.config
+- name: okada.core
+  type: library
+  depends_on:
+  - okada.config
+- name: okada.adapters.monitoring
+  type: adapter
+  depends_on:
+  - okada.core
+  - okada.audit
+- name: okada.adapters.drift
+  type: adapter
+  depends_on:
+  - okada.core
+  - okada.audit
+- name: okada.adapters.agent
+  type: adapter
+  depends_on:
+  - okada.core
+  - okada.audit
+- name: okada.adapters.rag
+  type: adapter
+  depends_on:
+  - okada.core
+  - okada.audit
+- name: okada.adapters.routing
+  type: adapter
+  depends_on:
+  - okada.core
+  - okada.audit
+- name: okada.integrations.dify
+  type: integration
+  depends_on:
+  - okada.api
+- name: okada.integrations.litellm
+  type: integration
+  depends_on:
+  - okada.api
+- name: okada.integrations.langgraph
+  type: integration
+  depends_on:
+  - okada.api
+- name: okada.integrations.openwebui
+  type: integration
+  depends_on:
+  - okada.api

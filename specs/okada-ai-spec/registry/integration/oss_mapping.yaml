@@ -1,0 +1,57 @@
+version: '0.3'
+source_of_truth: docs/22_component_mapping.md
+platforms:
+  dify:
+    role:
+    - app_shell
+    - workflow_orchestration
+    - rag_workflows
+    insertion_points:
+    - workflow.code_node.pre_retrieval
+    - workflow.code_node.post_retrieval
+    - workflow.code_node.pre_answer
+    - workflow.terminal.audit_push
+    specs:
+    - OKD-AI-001
+    - OKD-AI-002
+    - OKD-AI-004
+  litellm:
+    role:
+    - model_gateway
+    - routing_chokepoint
+    - cost_latency_metrics
+    insertion_points:
+    - proxy.pre_call_hook
+    - proxy.post_call_hook
+    - proxy.fallback_decision
+    specs:
+    - OKD-AI-001
+    - OKD-AI-004
+    - OKD-AI-005
+    - OKD-AI-009
+  langgraph:
+    role:
+    - stateful_agent_runtime
+    - interrupt
+    - human_handoff
+    insertion_points:
+    - node.after_planner
+    - middleware.before_tool_call
+    - middleware.after_tool_result
+    - node.before_final_answer
+    specs:
+    - OKD-AI-003
+  openwebui:
+    role:
+    - operator_console
+    - audit_view
+    - manual_review
+    insertion_points:
+    - pipeline.audit_read_model
+    - filter.route_visibility
+    - tool.manual_override
+    specs:
+    - OKD-AI-001
+    - OKD-AI-006
+    - OKD-AI-007
+    - OKD-AI-008

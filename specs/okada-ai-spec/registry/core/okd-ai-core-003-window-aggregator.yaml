@@ -1,0 +1,29 @@
+spec_id: OKD-AI-CORE-003
+name: Calibration Window Aggregator
+status: draft
+purpose: >-
+  Resolve replay windows for auto-calibration from audit-backed production logs,
+  using profile-specific cadence and volume rules.
+inputs:
+  - profile_name
+  - spec_id
+  - adapter_type
+  - strategy
+  - min_requests
+  - max_records
+  - max_age_hours
+  - max_age_days
+  - risk_class
+  - invocation
+outputs:
+  - selected WindowRecord list
+  - window summary
+  - backfilled_count
+  - risk_class breakdown
+  - invocation breakdown
+integration:
+  - /okada/auto-calibration/windows/resolve
+  - auto-calibration propose/validate when use_recent_audits=true
+notes:
+  - request_or_time backfills older records when the time-bounded slice is too small
+  - scheduler plans rely on this component for production-like replay windows

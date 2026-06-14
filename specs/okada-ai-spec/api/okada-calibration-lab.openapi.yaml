@@ -1,0 +1,14 @@
+openapi: 3.1.0
+info:
+  title: Okada Calibration Lab API
+  version: 0.1.0
+paths:
+  /okada/auto-calibration/lab/suites:
+    get:
+      summary: List calibration lab suites
+  /okada/auto-calibration/lab/replay:
+    post:
+      summary: Replay current and proposed policies on a suite
+  /okada/auto-calibration/lab/history:
+    get:
+      summary: List persisted calibration lab reports

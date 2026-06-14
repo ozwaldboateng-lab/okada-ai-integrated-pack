@@ -1,0 +1,29 @@
+version: "3.9"
+
+# Legacy compatibility template.
+# Preferred integrated path:
+# docker compose -f ops/integrated/docker-compose.kernel-gateway-ui.yml --env-file ops/integrated/.env up -d
+
+services:
+  okada-kernel:
+    build:
+      context: ..
+      dockerfile: apps/okada-kernel-service/Dockerfile
+    environment:
+      OKADA_AUDIT_PATH: /data/audit_records.jsonl
+      OKADA_DEFAULT_PROFILE: default
+      OKADA_SERVICE_NAME: okada-kernel
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+
+  # LiteLLM proxy is intentionally left as a template service.
+  # Fill in image/tag and mounted config after choosing a concrete deployment target.
+  litellm-proxy:
+    profiles: ["template"]
+    environment:
+      OKADA_BASE_URL: http://okada-kernel:8080
+      OKADA_SHARED_TOKEN: ${OKADA_SHARED_TOKEN:-change-me}
+    volumes:
+      - ../examples/litellm:/app/litellm-example

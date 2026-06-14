@@ -1,0 +1,26 @@
+spec_id: OKD-AI-CORE-004
+name: Adapter Metric Aggregators
+status: draft
+layer: core
+purpose: >-
+  Summarize calibration replay windows into adapter-specific metrics before proposal,
+  validation, and human review.
+inputs:
+  - resolved calibration window
+  - adapter_type
+  - profile_name
+outputs:
+  - common replay metrics
+  - adapter metrics
+  - counts
+  - notes
+  - window summary
+supported_adapters:
+  - routing
+  - rag
+  - monitoring
+  - drift
+  - agent
+non_goals:
+  - replacing replay validation
+  - direct policy adoption

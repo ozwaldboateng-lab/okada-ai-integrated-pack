@@ -1,0 +1,24 @@
+{
+  "spec_id": "OKD-AI-005",
+  "adapter_type": "routing",
+  "observables": {
+    "complexity_proxy": 0.82,
+    "historical_route_success": 0.41,
+    "risk_class": "high"
+  },
+  "context": {
+    "messages_count": 7,
+    "requested_model": "cheap-default"
+  },
+  "history_state": {
+    "recent_route": "cheap-only"
+  },
+  "resource_state": {
+    "budget_remaining": 0.35,
+    "latency_load_state": 0.62
+  },
+  "policy_profile": {
+    "profile_name": "default",
+    "deterministic_mode": true
+  }
+}

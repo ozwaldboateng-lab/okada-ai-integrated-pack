@@ -1,0 +1,52 @@
+spec_id: OKD-AI-004
+name: RAG Freshness / Context Contamination Governance
+version: "0.2"
+adapter_type: rag
+status: Ready for detailed implementation
+purpose: >
+  retrieval の要否、深さ、再検索、freshness 警告、abstain を統御する。
+non_goals:
+  - embedding model replacement
+  - vector db replacement
+required_observables:
+  - retrieval_score_distribution
+  - source_freshness
+  - chunk_conflict_rate
+  - grounding_confidence
+  - index_age
+optional_observables:
+  - reranker_disagreement
+  - source_priority
+  - source_of_truth_flag
+  - chunk_redundancy
+  - question_time_sensitivity
+required_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - context_contamination_score
+  - freshness_gap_score
+actions:
+  clean:
+    - no_retrieval
+    - standard_retrieval
+  mixed:
+    - deeper_retrieve
+    - rerank_again
+  contaminated:
+    - require_fresh_source
+    - abstain
+    - human_review
+oss_targets:
+  primary:
+    - Dify
+  secondary:
+    - LiteLLM
+    - Open WebUI
+benchmark_minimum:
+  - fresh_clean_corpus
+  - stale_corpus
+  - conflicting_corpus
+  - mixed_freshness_corpus
+  - unanswerable_query

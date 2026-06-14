@@ -1,0 +1,14 @@
+version: 2
+workflow_examples:
+  - name: rag-pre-retrieval-gateway
+    endpoint: /integrations/dify/rag/pre-retrieval
+    payload_file: http_request_payload_pre.json
+    code_node: code_node_pre_retrieval.py
+  - name: rag-post-retrieval-gateway
+    endpoint: /integrations/dify/rag/post-retrieval
+    payload_file: http_request_payload_post.json
+    code_node: code_node_post_retrieval.py
+  - name: rag-fail-safe-gateway
+    endpoint: /integrations/dify/fail-safe
+    payload_file: http_request_payload_fail_safe.json
+    code_node: code_node_pre_retrieval.py

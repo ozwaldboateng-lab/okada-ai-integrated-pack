@@ -1,0 +1,3 @@
+{"query_id":"r1","utility":0.74,"success":1,"cost":0.012,"latency_ms":820,"H_dom":0.70,"H_hist":0.18,"H_comp":0.22,"action":"cheap_then_fallback","risk_class":"normal"}
+{"query_id":"r2","utility":0.42,"success":0,"cost":0.010,"latency_ms":910,"H_dom":0.40,"H_hist":0.31,"H_comp":0.55,"action":"cheap_only","risk_class":"normal"}
+{"query_id":"r3","utility":0.81,"success":1,"cost":0.018,"latency_ms":960,"H_dom":0.77,"H_hist":0.12,"H_comp":0.16,"action":"promote_strong","risk_class":"high"}

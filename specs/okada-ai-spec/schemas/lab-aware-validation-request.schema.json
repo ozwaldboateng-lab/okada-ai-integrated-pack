@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LabAwareValidationRequest",
+  "type": "object",
+  "required": ["profile_name", "spec_id", "adapter_type", "proposed_policy"],
+  "properties": {
+    "profile_name": {"type": "string"},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "proposed_policy": {"type": "object"},
+    "run_calibration_lab": {"type": "boolean"},
+    "lab_suite_name": {"type": ["string", "null"]},
+    "persist_lab_report": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

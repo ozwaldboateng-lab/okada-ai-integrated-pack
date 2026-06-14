@@ -1,0 +1,14 @@
+{
+  "rag_shadow_daily": {
+    "adopted_revision_id": null,
+    "candidate_id": "65172dea-20d4-4638-8bc1-e46bb05accf0",
+    "last_action": "candidate_created",
+    "last_run_at": "2026-06-13T08:54:50.218907+00:00"
+  },
+  "routing_guarded_daily": {
+    "adopted_revision_id": null,
+    "candidate_id": null,
+    "last_action": "proposal_ready",
+    "last_run_at": "2026-06-13T08:54:50.267424+00:00"
+  }
+}

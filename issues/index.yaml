@@ -1,0 +1,240 @@
+version: v1.4
+tasks:
+- id: TASK-KERNEL-001
+  title: Stabilize core scoring and normalization contracts
+  epic: EPIC-001
+  priority: p0
+  status: ready
+  owner: shared
+  labels:
+  - kernel
+  - tests
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-kernel-001.md
+- id: TASK-KERNEL-002
+  title: Add policy parameter registry and environment-backed overrides
+  epic: EPIC-001
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - kernel
+  - ops
+  - parallel-safe
+  - good-first-task
+  deps: []
+  file: issues/tasks/task-kernel-002.md
+- id: TASK-KERNEL-003
+  title: Promote audit storage from JSONL-only bootstrap to pluggable backend contract
+  epic: EPIC-001
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - kernel
+  - audit
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-kernel-003.md
+- id: TASK-QA-001
+  title: Add kernel acceptance scenarios for first-wave adapters
+  epic: EPIC-001
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - tests
+  - kernel
+  - parallel-safe
+  deps:
+  - TASK-KERNEL-001
+  file: issues/tasks/task-qa-001.md
+- id: TASK-LIT-001
+  title: Wire LiteLLM callback to the integration gateway in runnable local mode
+  epic: EPIC-002
+  priority: p0
+  status: ready
+  owner: shared
+  labels:
+  - litellm
+  - integration-gateway
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-lit-001.md
+- id: TASK-LIT-002
+  title: Add LiteLLM demo route matrix and acceptance smoke
+  epic: EPIC-002
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - litellm
+  - tests
+  - serial
+  deps:
+  - TASK-LIT-001
+  file: issues/tasks/task-lit-002.md
+- id: TASK-LIT-003
+  title: Unify LiteLLM compose and root compose references
+  epic: EPIC-002
+  priority: p2
+  status: ready
+  owner: shared
+  labels:
+  - litellm
+  - ops
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-lit-003.md
+- id: TASK-DIFY-001
+  title: Convert Dify HTTP request and code-node examples into a gateway-first import
+    pack
+  epic: EPIC-003
+  priority: p0
+  status: ready
+  owner: shared
+  labels:
+  - dify
+  - integration-gateway
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-dify-001.md
+- id: TASK-DIFY-002
+  title: Add Dify live RAG demo walkthrough and expected decision matrix
+  epic: EPIC-003
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - dify
+  - docs
+  - serial
+  deps:
+  - TASK-DIFY-001
+  file: issues/tasks/task-dify-002.md
+- id: TASK-DIFY-003
+  title: Package Dify fail-safe behavior for offline or gateway-error mode
+  epic: EPIC-003
+  priority: p2
+  status: ready
+  owner: shared
+  labels:
+  - dify
+  - parallel-safe
+  - good-first-task
+  deps: []
+  file: issues/tasks/task-dify-003.md
+- id: TASK-LANG-001
+  title: Stabilize LangGraph step middleware contract around gateway endpoints
+  epic: EPIC-004
+  priority: p0
+  status: ready
+  owner: shared
+  labels:
+  - langgraph
+  - integration-gateway
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-lang-001.md
+- id: TASK-LANG-002
+  title: Add governed-agent resume demo with interrupt outcomes
+  epic: EPIC-004
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - langgraph
+  - serial
+  - tests
+  deps:
+  - TASK-LANG-001
+  file: issues/tasks/task-lang-002.md
+- id: TASK-LANG-003
+  title: Expand LangGraph acceptance matrix for route contamination patterns
+  epic: EPIC-004
+  priority: p2
+  status: ready
+  owner: shared
+  labels:
+  - langgraph
+  - tests
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-lang-003.md
+- id: TASK-OWUI-001
+  title: Package Open WebUI pipe and filter as operator-ready artifacts
+  epic: EPIC-005
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - openwebui
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-owui-001.md
+- id: TASK-OWUI-002
+  title: Add manual evaluation and audit-view workflow for Open WebUI
+  epic: EPIC-005
+  priority: p2
+  status: ready
+  owner: shared
+  labels:
+  - openwebui
+  - docs
+  - serial
+  deps:
+  - TASK-OWUI-001
+  file: issues/tasks/task-owui-002.md
+- id: TASK-E2E-001
+  title: Make integrated compose bring-up path consistent and reproducible
+  epic: EPIC-006
+  priority: p0
+  status: ready
+  owner: shared
+  labels:
+  - ops
+  - integration-gateway
+  - serial
+  deps: []
+  file: issues/tasks/task-e2e-001.md
+- id: TASK-E2E-002
+  title: Automate baseline-vs-okada benchmark report generation
+  epic: EPIC-006
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - benchmark
+  - tests
+  - serial
+  deps:
+  - TASK-E2E-001
+  - TASK-LIT-001
+  - TASK-DIFY-001
+  - TASK-LANG-001
+  - TASK-OWUI-001
+  file: issues/tasks/task-e2e-002.md
+- id: TASK-BENCH-001
+  title: Expand E2E fixtures beyond current happy-path utility wins
+  epic: EPIC-006
+  priority: p1
+  status: ready
+  owner: shared
+  labels:
+  - benchmark
+  - parallel-safe
+  deps: []
+  file: issues/tasks/task-bench-001.md
+- id: TASK-DOC-001
+  title: Refresh operator-facing walkthrough after unified gateway migration
+  epic: EPIC-006
+  priority: p2
+  status: ready
+  owner: shared
+  labels:
+  - docs
+  - parallel-safe
+  - good-first-task
+  deps: []
+  file: issues/tasks/task-doc-001.md

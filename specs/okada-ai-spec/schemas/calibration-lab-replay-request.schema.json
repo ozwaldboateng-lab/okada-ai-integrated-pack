@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "profile_name",
+    "spec_id",
+    "adapter_type"
+  ],
+  "properties": {
+    "profile_name": {
+      "type": "string"
+    },
+    "spec_id": {
+      "type": "string"
+    },
+    "adapter_type": {
+      "type": "string"
+    },
+    "suite_name": {
+      "type": "string"
+    },
+    "generate_proposal_if_missing": {
+      "type": "boolean"
+    }
+  }
+}

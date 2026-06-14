@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FixtureSuiteBuildResponse",
+  "type": "object",
+  "required": ["profile_name", "spec_id", "adapter_type", "suite_name", "summary"],
+  "properties": {
+    "profile_name": {"type": "string"},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "suite_name": {"type": "string"},
+    "fixture_path": {"type": ["string", "null"]},
+    "manifest_updated": {"type": "boolean"},
+    "summary": {"type": "object"},
+    "preview_cases": {"type": "array"}
+  }
+}

@@ -1,0 +1,50 @@
+spec_id: OKD-AI-002
+name: MLOps Concept Drift Thresholding
+version: "0.2"
+adapter_type: mlops
+status: Ready for detailed implementation
+purpose: >
+  drift detector を置き換えず、その出力を intervention decision に変換する。
+non_goals:
+  - new drift detector
+  - full retraining pipeline orchestration
+required_observables:
+  - feature_drift_score
+  - uncertainty_drift
+  - calibration_lag
+  - performance_decay_proxy
+optional_observables:
+  - challenger_disagreement
+  - label_delay
+  - label_drift_proxy
+  - retrain_cost_estimate
+  - rollback_candidate_available
+required_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - retrain_pressure_score
+  - rollback_viability_score
+actions:
+  clean:
+    - keep
+  mixed:
+    - watch
+    - shadow_deploy
+  contaminated:
+    - rollback
+    - retrain
+    - human_approval
+oss_targets:
+  primary:
+    - External Service
+  secondary:
+    - Dify
+    - Open WebUI
+benchmark_minimum:
+  - no_drift
+  - transient_drift
+  - recoverable_drift
+  - hard_concept_shift
+  - false_alarm

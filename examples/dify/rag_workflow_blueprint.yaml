@@ -1,0 +1,84 @@
+workflow_name: okada_rag_governed_workflow
+goal: >
+  Call the Okada kernel before and after retrieval to decide whether to retrieve,
+  retrieve deeper, or abstain.
+
+nodes:
+  - id: start
+    type: start
+    outputs:
+      - user_query
+
+  - id: build_observables
+    type: code
+    purpose: build observables for RAG governance
+    outputs:
+      - observables_json
+
+  - id: okada_pre_retrieval
+    type: http_request
+    method: POST
+    url: "{{ENV.OKADA_BASE_URL}}/integrations/dify/rag/pre-retrieval"
+    auth: bearer
+    body_type: json
+    body_source: http_request_payload_pre.json
+    on_error: okada_fail_safe
+
+  - id: route_pre_retrieval
+    type: code
+    purpose: derive retrieval action from kernel response
+    outputs:
+      - retrieval_action
+
+  - id: conditional_retrieval
+    type: branch
+    routes:
+      - when: retrieval_action == "no_retrieval"
+        next: generate_without_rag
+      - when: retrieval_action == "standard_retrieve"
+        next: knowledge_retrieve
+      - when: retrieval_action == "deeper_retrieve"
+        next: knowledge_retrieve_deeper
+      - when: retrieval_action == "abstain"
+        next: abstain_response
+
+  - id: knowledge_retrieve
+    type: knowledge_retrieval
+
+  - id: knowledge_retrieve_deeper
+    type: knowledge_retrieval
+    config:
+      top_k: 8
+      rerank: true
+
+  - id: okada_post_retrieval
+    type: http_request
+    method: POST
+    url: "{{ENV.OKADA_BASE_URL}}/integrations/dify/rag/post-retrieval"
+    body_source: http_request_payload_post.json
+    on_error: okada_fail_safe
+
+  - id: route_post_retrieval
+    type: code
+
+  - id: okada_fail_safe
+    type: http_request
+    method: POST
+    url: "{{ENV.OKADA_BASE_URL}}/integrations/dify/fail-safe"
+    body_source: http_request_payload_fail_safe.json
+
+  - id: route_fail_safe
+    type: code
+    purpose: expose okada_governance_available=false and standard retrieval defaults
+
+  - id: final_branch
+    type: branch
+    routes:
+      - when: final_action == "rerank_again"
+        next: rerank
+      - when: final_action == "require_fresh_source"
+        next: fresh_source_fetch
+      - when: final_action == "abstain"
+        next: abstain_response
+      - when: final_action == "continue"
+        next: answer_generation

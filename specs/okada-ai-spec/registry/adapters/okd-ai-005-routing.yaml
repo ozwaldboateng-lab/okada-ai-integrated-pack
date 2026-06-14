@@ -1,0 +1,51 @@
+spec_id: OKD-AI-005
+name: Multi-model / Multi-strategy Routing Governance
+version: "0.2"
+adapter_type: routing
+status: Ready for detailed implementation
+purpose: >
+  同一モデル群・同一予算の中で、どの model / strategy / retrieval depth を使うかを選ぶ。
+non_goals:
+  - model training
+  - full scheduler replacement
+required_observables:
+  - complexity_proxy
+  - budget_remaining
+  - latency_load_state
+  - risk_class
+  - historical_route_success
+optional_observables:
+  - retrieval_need_estimate
+  - question_time_sensitivity
+  - compliance_level
+  - heavy_model_availability
+  - parallel_budget_flag
+required_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - route_stability_score
+  - promotion_pressure_score
+actions:
+  clean:
+    - cheap_only
+    - strong_only
+  mixed:
+    - cheap_then_fallback_strong
+    - bounded_hybrid
+  contaminated:
+    - strong_only
+    - branchwise_hybrid
+oss_targets:
+  primary:
+    - LiteLLM
+  secondary:
+    - Dify
+    - Open WebUI
+benchmark_minimum:
+  - easy_low_risk
+  - hard_reasoning
+  - retrieval_heavy
+  - latency_sensitive
+  - budget_stressed

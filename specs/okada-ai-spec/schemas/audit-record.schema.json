@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuditRecord",
+  "type": "object",
+  "required": [
+    "audit_trace_id",
+    "timestamp",
+    "spec_id",
+    "adapter_type",
+    "raw_inputs",
+    "normalized_inputs",
+    "derived_features",
+    "decision"
+  ],
+  "properties": {
+    "audit_trace_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "spec_id": {
+      "type": "string"
+    },
+    "adapter_type": {
+      "type": "string"
+    },
+    "raw_inputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "normalized_inputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "derived_features": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "recommended_action": {
+      "type": "string"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy_snapshot": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "audit_persisted": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

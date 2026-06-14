@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoCalibrationProposalRequest",
+  "type": "object",
+  "required": ["adapter_type", "current_config", "policy_profile", "log_window"],
+  "properties": {
+    "adapter_type": {"type": "string", "enum": ["monitoring", "drift", "rag", "routing", "agent"]},
+    "current_config": {"type": "object", "additionalProperties": true},
+    "policy_profile": {"type": "object", "additionalProperties": true},
+    "log_window": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true},
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CalibrationWindowRequest",
+  "type": "object",
+  "required": ["spec_id", "adapter_type"],
+  "properties": {
+    "profile_name": {"type": ["string", "null"]},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "strategy": {"type": ["string", "null"], "enum": ["request", "time", "request_or_time", null]},
+    "min_requests": {"type": ["integer", "null"], "minimum": 1},
+    "max_records": {"type": ["integer", "null"], "minimum": 1},
+    "max_age_hours": {"type": ["integer", "null"], "minimum": 1},
+    "max_age_days": {"type": ["integer", "null"], "minimum": 1},
+    "risk_class": {"type": ["string", "null"]},
+    "invocation": {"type": ["string", "null"], "enum": ["diagnose", "route", "intervene", null]},
+    "include_records": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

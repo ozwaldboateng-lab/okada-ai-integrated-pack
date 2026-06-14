@@ -1,0 +1,24 @@
+version: v1.4
+source_of_truth:
+- specs/okada-ai-spec/
+- apps/okada-kernel-service/
+- issues/
+epics:
+- id: EPIC-001
+  title: Kernel hardening and policy calibration
+  status: ready
+- id: EPIC-002
+  title: LiteLLM live integration
+  status: ready
+- id: EPIC-003
+  title: Dify live RAG workflow integration
+  status: ready
+- id: EPIC-004
+  title: LangGraph live agent governance integration
+  status: ready
+- id: EPIC-005
+  title: Open WebUI operator console integration
+  status: ready
+- id: EPIC-006
+  title: Integrated stack bring-up and E2E benchmark
+  status: ready

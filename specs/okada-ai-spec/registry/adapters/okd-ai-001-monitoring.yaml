@@ -1,0 +1,62 @@
+spec_id: OKD-AI-001
+name: Post-deployment Monitoring / Trust Window Governance
+version: "0.2"
+adapter_type: monitoring
+status: Ready for detailed implementation
+purpose: >
+  本番運用中AIの trust window を評価し、watch / shadow validation / rollback / retrain trigger / human review を決める。
+non_goals:
+  - drift detector replacement
+  - RCA execution
+required_observables:
+  - confidence_trend
+  - calibration_error_trend
+  - fallback_rate
+  - override_rate
+  - latency_instability
+  - output_shift_score
+optional_observables:
+  - delayed_gt_disagreement
+  - tool_failure_rate
+  - complaint_rate
+  - recent_release_flag
+normalized_fields:
+  - confidence_level
+  - confidence_slope
+  - calibration_debt
+  - fallback_ratio_vs_baseline
+  - override_ratio_vs_baseline
+  - latency_volatility
+  - output_shift_ratio
+required_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - trust_window_score
+decision_outputs:
+  - trust_state
+  - regime
+  - recommended_action
+actions:
+  clean:
+    - continue
+  mixed:
+    - watch
+    - shadow_validation
+  contaminated:
+    - rollback
+    - retrain_trigger
+    - human_review
+oss_targets:
+  primary:
+    - Dify
+    - External Service
+  secondary:
+    - LiteLLM
+    - Open WebUI
+benchmark_minimum:
+  - stable_operation
+  - soft_degradation
+  - hard_degradation
+  - false_alarm

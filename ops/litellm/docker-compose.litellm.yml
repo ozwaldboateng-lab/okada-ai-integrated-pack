@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  okada-kernel:
+    build:
+      context: ../..
+      dockerfile: apps/okada-kernel-service/Dockerfile
+    environment:
+      OKADA_AUDIT_PATH: /data/audit_records.jsonl
+      OKADA_DEFAULT_PROFILE: default
+      OKADA_SERVICE_NAME: okada-kernel
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../data/audit:/data
+
+  litellm-proxy:
+    image: ${LITELLM_IMAGE}
+    depends_on:
+      - okada-kernel
+    environment:
+      OKADA_BASE_URL: ${OKADA_BASE_URL}
+      OKADA_SHARED_TOKEN: ${OKADA_SHARED_TOKEN}
+      OKADA_POLICY_PROFILE: ${OKADA_POLICY_PROFILE}
+      OKADA_DETERMINISTIC_MODE: ${OKADA_DETERMINISTIC_MODE}
+      OKADA_ROUTE_MAP_PATH: ${OKADA_ROUTE_MAP_PATH}
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      CHEAP_MODEL_NAME: ${CHEAP_MODEL_NAME}
+      STRONG_MODEL_NAME: ${STRONG_MODEL_NAME}
+      PYTHONPATH: ${PYTHONPATH}
+    working_dir: /app
+    volumes:
+      - ../../:/app
+    command: >
+      bash -lc "python scripts/render_litellm_config.py --template examples/litellm/proxy_config.template.yaml --route-map ${OKADA_ROUTE_MAP_PATH} --output /tmp/litellm.config.yaml &&
+      litellm --config /tmp/litellm.config.yaml --port ${LITELLM_PROXY_PORT}"
+    ports:
+      - "${LITELLM_PROXY_PORT}:${LITELLM_PROXY_PORT}"

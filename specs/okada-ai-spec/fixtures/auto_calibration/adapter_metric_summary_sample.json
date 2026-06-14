@@ -1,0 +1,39 @@
+{
+  "profile_name": "routing_default",
+  "spec_id": "OKD-AI-005",
+  "adapter_type": "routing",
+  "summary": {
+    "window_size": 3,
+    "rdiag_p40": 0.52,
+    "rdiag_p80": 0.93,
+    "mean_h_dom": 0.61,
+    "mean_h_hist": 0.18,
+    "mean_h_comp": 0.27,
+    "adapter_metrics": {
+      "mean_utility": 0.73,
+      "promotion_pressure_mean": 0.41,
+      "budget_tight_rate": 0.33
+    },
+    "counts": {
+      "record_count": 3,
+      "success_count": 2
+    },
+    "notes": [
+      "Routing summary emphasizes promotion pressure and budget tightness."
+    ]
+  },
+  "window_summary": {
+    "strategy": "request_or_time",
+    "selected_count": 3,
+    "available_count": 5,
+    "backfilled_count": 1,
+    "risk_class_breakdown": {
+      "high": 1,
+      "standard": 2
+    },
+    "invocation_breakdown": {
+      "route": 3
+    }
+  },
+  "source_window": "audit_aggregated"
+}

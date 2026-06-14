@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StateTransition",
+  "type": "object",
+  "required": [
+    "from_state",
+    "to_state",
+    "reason",
+    "timestamp"
+  ],
+  "properties": {
+    "from_state": {
+      "type": "string"
+    },
+    "to_state": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "spec_id": {
+      "type": "string"
+    },
+    "intervention": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

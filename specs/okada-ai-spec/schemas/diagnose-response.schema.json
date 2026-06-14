@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiagnoseResponse",
+  "type": "object",
+  "required": [
+    "spec_id",
+    "regime",
+    "type_class",
+    "scores",
+    "first_visible_handle",
+    "recommended_action",
+    "audit_trace_id"
+  ],
+  "properties": {
+    "spec_id": {
+      "type": "string"
+    },
+    "regime": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "mixed",
+        "contaminated"
+      ]
+    },
+    "type_class": {
+      "type": "string",
+      "enum": [
+        "I",
+        "II",
+        "III",
+        "undefined"
+      ]
+    },
+    "trust_state": {
+      "type": "string",
+      "enum": [
+        "safe",
+        "caution",
+        "unsafe",
+        "undefined"
+      ]
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "first_visible_handle": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommended_action": {
+      "type": "string"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "audit_trace_id": {
+      "type": "string"
+    },
+    "audit_persisted": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,21 @@
+model_list:
+  - model_name: cheap-default
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_base: ${OPENAI_API_BASE}
+      api_key: ${OPENAI_API_KEY}
+
+  - model_name: strong-default
+    litellm_params:
+      model: openai/gpt-4.1
+      api_base: ${OPENAI_API_BASE}
+      api_key: ${OPENAI_API_KEY}
+
+litellm_settings:
+  modify_params: true
+  callbacks: []
+  turn_off_message_logging: false
+
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY}
+  custom_callback: "examples/litellm/okada_custom_handler.py::OkadaLiteLLMHandler"

@@ -1,0 +1,52 @@
+spec_id: OKD-AI-003
+name: Agentic AI Route Contamination and Escalation Governance
+version: "0.2"
+adapter_type: agent
+status: Ready for detailed implementation
+purpose: >
+  multi-step agent runtime において clean route の崩れを早く見つけ、continue / replan / handoff / abort を決める。
+non_goals:
+  - full alignment solution
+  - baseline agent capability improvement
+required_observables:
+  - planner_executor_mismatch
+  - tool_disagreement
+  - retry_count
+  - unresolved_subgoal_count
+  - route_split_frequency
+optional_observables:
+  - retrieval_contradiction_rate
+  - context_age_penalty
+  - tool_failure_severity
+  - high_risk_action_flag
+  - human_confirmation_available
+required_features:
+  - H_dom
+  - H_hist
+  - H_comp
+  - V_first
+  - route_integrity_score
+  - escalation_pressure_score
+actions:
+  clean:
+    - continue
+  mixed:
+    - constrained_continue
+    - replan
+  contaminated:
+    - human_handoff
+    - abort
+    - disable_tool_subset
+oss_targets:
+  primary:
+    - LangGraph
+  secondary:
+    - LiteLLM
+    - Open WebUI
+    - Dify
+benchmark_minimum:
+  - clean_success
+  - noisy_recoverable
+  - tool_loop_failure
+  - contradiction_derailment
+  - high_risk_action

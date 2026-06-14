@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Okada Auto-Calibration API
+  version: 0.1.0
+paths:
+  /okada/auto-calibration/windows/resolve:
+    post:
+      summary: Resolve an audit-backed calibration window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalibrationWindowRequest'
+      responses:
+        '200':
+          description: resolved calibration window
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationWindowResponse'
+  /okada/calibration/propose:
+    post:
+      summary: Propose a candidate config from a log window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalibrationProposalRequest'
+      responses:
+        '200':
+          description: candidate config generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationProposalResponse'
+  /okada/calibration/validate:
+    post:
+      summary: Validate a candidate config against replay cases
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalibrationValidationRequest'
+      responses:
+        '200':
+          description: validation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationValidationResponse'
+  /okada/calibration/adopt:
+    post:
+      summary: Decide whether to adopt a candidate config
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalibrationAdoptionRequest'
+      responses:
+        '200':
+          description: adoption decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationAdoptionResponse'
+components:
+  schemas:
+    CalibrationProposalRequest:
+      type: object
+      required: [adapter_type, current_config, policy_profile, log_window]
+      properties:
+        adapter_type:
+          type: string
+        current_config:
+          type: object
+          additionalProperties: true
+        policy_profile:
+          type: object
+          additionalProperties: true
+        log_window:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    CalibrationProposalResponse:
+      type: object
+      required: [candidate_config, delta_summary]
+      properties:
+        candidate_config:
+          type: object
+          additionalProperties: true
+        delta_summary:
+          type: object
+          additionalProperties: true
+        notes:
+          type: array
+          items: {type: string}
+    CalibrationValidationRequest:
+      type: object
+      required: [adapter_type, current_config, candidate_config, replay_cases]
+      properties:
+        adapter_type: {type: string}
+        current_config:
+          type: object
+          additionalProperties: true
+        candidate_config:
+          type: object
+          additionalProperties: true
+        replay_cases:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    CalibrationValidationResponse:
+      type: object
+      required: [verdict, metrics]
+      properties:
+        verdict:
+          type: string
+          enum: [pass, fail, warn]
+        metrics:
+          type: object
+          additionalProperties: true
+        comparison:
+          type: object
+          additionalProperties: true
+        reasons:
+          type: array
+          items: {type: string}
+    CalibrationAdoptionRequest:
+      type: object
+      required: [adapter_type, current_config, candidate_config, validation_report, policy_profile]
+      properties:
+        adapter_type: {type: string}
+        current_config:
+          type: object
+          additionalProperties: true
+        candidate_config:
+          type: object
+          additionalProperties: true
+        validation_report:
+          type: object
+          additionalProperties: true
+        policy_profile:
+          type: object
+          additionalProperties: true
+    CalibrationAdoptionResponse:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [reject, shadow, adopt]
+        rollout_scope:
+          type: string
+        reasons:
+          type: array
+          items: {type: string}
+        rollback_policy:
+          type: object
+          additionalProperties: true
+
+    CalibrationWindowRequest:
+      type: object
+      required: [spec_id, adapter_type]
+      properties:
+        profile_name: {type: string, nullable: true}
+        spec_id: {type: string}
+        adapter_type: {type: string}
+        strategy:
+          type: string
+          enum: [request, time, request_or_time]
+        min_requests: {type: integer, nullable: true}
+        max_records: {type: integer, nullable: true}
+        max_age_hours: {type: integer, nullable: true}
+        max_age_days: {type: integer, nullable: true}
+        risk_class: {type: string, nullable: true}
+        invocation:
+          type: string
+          enum: [diagnose, route, intervene]
+          nullable: true
+        include_records: {type: boolean}
+    CalibrationWindowResponse:
+      type: object
+      required: [spec_id, adapter_type, strategy, summary]
+      properties:
+        profile_name: {type: string, nullable: true}
+        spec_id: {type: string}
+        adapter_type: {type: string}
+        strategy: {type: string}
+        source_window: {type: string}
+        records:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        summary:
+          type: object
+          additionalProperties: true

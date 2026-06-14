@@ -1,0 +1,9 @@
+{
+  "payload": {
+    "reason": "{{#sys.okada_fail_safe_reason#}}"
+  },
+  "options": {
+    "default_action": "standard_retrieve",
+    "default_regime": "mixed"
+  }
+}

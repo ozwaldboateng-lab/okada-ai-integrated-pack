@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoCalibrationAuditRecord",
+  "type": "object",
+  "required": ["adapter_type", "previous_config", "candidate_config", "validation_report", "decision", "timestamp"],
+  "properties": {
+    "adapter_type": {"type": "string"},
+    "previous_config": {"type": "object", "additionalProperties": true},
+    "candidate_config": {"type": "object", "additionalProperties": true},
+    "validation_report": {"type": "object", "additionalProperties": true},
+    "decision": {"type": "string", "enum": ["reject", "shadow", "adopt", "rollback"]},
+    "timestamp": {"type": "string"},
+    "reasons": {"type": "array", "items": {"type": "string"}},
+    "rollback_policy": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}

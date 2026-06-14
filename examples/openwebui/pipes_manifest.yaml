@@ -1,0 +1,29 @@
+version: 2
+install_order:
+  - okada-governance-pipe
+  - okada-audit-filter
+required_env:
+  - OKADA_BASE_URL
+optional_env:
+  - OKADA_SHARED_TOKEN
+  - OPENWEBUI_OKADA_CHEAP_MODEL_ID
+  - OPENWEBUI_OKADA_STRONG_MODEL_ID
+  - OPENWEBUI_OKADA_BLOCK_ON_CONTAMINATED
+components:
+  - name: okada-governance-pipe
+    type: pipe
+    endpoint: /integrations/openwebui/pipe
+    file: okada_governance_pipe.py
+    valves:
+      - NAME_PREFIX
+      - CHEAP_MODEL_ID
+      - STRONG_MODEL_ID
+      - OKADA_BASE_URL
+      - OKADA_SHARED_TOKEN
+  - name: okada-audit-filter
+    type: filter
+    endpoint: /integrations/openwebui/filter
+    file: okada_audit_filter.py
+    valves:
+      - OKADA_BASE_URL
+      - OKADA_SHARED_TOKEN

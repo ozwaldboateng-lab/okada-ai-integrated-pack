@@ -1,0 +1,16 @@
+spec_id: OKD-AI-CORE-006
+name: Calibration Lab Replay and Comparison
+purpose: Replay current and proposed policies on fixture suites and generate comparable human-readable reports before adoption.
+inputs:
+  - fixture suites
+  - current policy
+  - proposed policy or proposal generation inputs
+outputs:
+  - replay summary
+  - case-by-case deltas
+  - persisted markdown report
+  - report history
+acceptance:
+  - utilities compared against baseline and current
+  - preferred action match rate included
+  - report persisted

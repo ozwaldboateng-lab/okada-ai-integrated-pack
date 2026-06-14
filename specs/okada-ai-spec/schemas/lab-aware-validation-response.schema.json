@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LabAwareValidationResponse",
+  "type": "object",
+  "properties": {
+    "lab_summary": {"type": ["object", "null"], "additionalProperties": true},
+    "lab_report_id": {"type": ["string", "null"]},
+    "lab_report_path": {"type": ["string", "null"]},
+    "lab_suite_name": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

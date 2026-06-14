@@ -1,0 +1,33 @@
+version: '0.3'
+phase: phase1
+tasks:
+- id: PH1-001
+  title: Generate FastAPI skeleton from OpenAPI
+  deliverable: running service with health and core endpoints
+- id: PH1-002
+  title: Implement pydantic request/response models
+  deliverable: validated API payloads
+- id: PH1-003
+  title: Implement audit persistence
+  deliverable: JSONL or sqlite-backed audit writer
+- id: PH1-004
+  title: Implement adapter protocol and registry
+  deliverable: adapter dispatch by spec_id
+- id: PH1-005
+  title: Stub routing adapter
+  deliverable: OKD-AI-005 dry-run capable
+- id: PH1-006
+  title: Stub rag adapter
+  deliverable: OKD-AI-004 dry-run capable
+- id: PH1-007
+  title: Add fixture-driven tests
+  deliverable: pytest suite loading fixtures
+- id: PH1-008
+  title: Create Dify and LiteLLM stubs
+  deliverable: callable integration clients
+- id: PH1-009
+  title: Stub agent adapter and LangGraph middleware
+  deliverable: interrupt-ready governance middleware
+- id: PH1-010
+  title: Stub monitoring and drift adapters
+  deliverable: basic action proposals for OKD-AI-001/002

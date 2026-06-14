@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: Okada Auto-Calibration Scheduler + Champion Challenger API
+  version: 1.10.0
+paths:
+  /okada/auto-calibration/scheduler/plans:
+    get:
+      summary: List scheduler plans
+  /okada/auto-calibration/scheduler/status:
+    get:
+      summary: Get scheduler plan status
+  /okada/auto-calibration/scheduler/run-plan:
+    post:
+      summary: Run one scheduler plan
+  /okada/auto-calibration/scheduler/run-due:
+    post:
+      summary: Run all due scheduler plans
+  /okada/auto-calibration/champion-challenger/candidates:
+    get:
+      summary: List shadow candidates
+  /okada/auto-calibration/champion-challenger/prepare:
+    post:
+      summary: Prepare challenger candidate
+  /okada/auto-calibration/champion-challenger/evaluate:
+    post:
+      summary: Evaluate challenger against current champion
+  /okada/auto-calibration/champion-challenger/promote:
+    post:
+      summary: Promote eligible challenger to champion

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiagnoseRequest",
+  "type": "object",
+  "required": [
+    "spec_id",
+    "adapter_type",
+    "observables",
+    "context",
+    "history_state",
+    "resource_state"
+  ],
+  "properties": {
+    "spec_id": {
+      "type": "string",
+      "enum": [
+        "OKD-AI-CORE-001",
+        "OKD-AI-001",
+        "OKD-AI-002",
+        "OKD-AI-003",
+        "OKD-AI-004",
+        "OKD-AI-005"
+      ]
+    },
+    "adapter_type": {
+      "type": "string",
+      "enum": [
+        "monitoring",
+        "mlops",
+        "agent",
+        "rag",
+        "routing",
+        "anomaly",
+        "rca",
+        "eval",
+        "infra",
+        "security",
+        "quantum"
+      ]
+    },
+    "observables": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "history_state": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "resource_state": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "policy_profile": {
+      "$ref": "policy-profile.schema.json"
+    },
+    "counterfactual_candidates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

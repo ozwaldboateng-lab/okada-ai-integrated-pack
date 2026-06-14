@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CalibrationWindowResponse",
+  "type": "object",
+  "required": ["spec_id", "adapter_type", "strategy", "summary"],
+  "properties": {
+    "profile_name": {"type": ["string", "null"]},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "strategy": {"type": "string"},
+    "source_window": {"type": "string"},
+    "records": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": false
+}

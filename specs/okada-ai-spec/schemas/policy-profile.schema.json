@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PolicyProfile",
+  "type": "object",
+  "properties": {
+    "profile_name": {
+      "type": "string"
+    },
+    "deterministic_mode": {
+      "type": "boolean"
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "weights": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "preferred_actions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "capture_raw_inputs": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

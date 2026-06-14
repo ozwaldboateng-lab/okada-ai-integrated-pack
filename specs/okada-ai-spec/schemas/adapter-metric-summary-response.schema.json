@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AdapterMetricSummaryResponse",
+  "type": "object",
+  "required": ["spec_id", "adapter_type", "summary", "window_summary"],
+  "properties": {
+    "profile_name": {"type": ["string", "null"]},
+    "spec_id": {"type": "string"},
+    "adapter_type": {"type": "string"},
+    "summary": {"type": "object"},
+    "window_summary": {"type": "object"},
+    "source_window": {"type": "string"},
+    "records": {"type": "array"}
+  },
+  "additionalProperties": true
+}

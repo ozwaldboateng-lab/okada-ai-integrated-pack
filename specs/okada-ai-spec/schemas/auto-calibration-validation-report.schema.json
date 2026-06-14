@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoCalibrationValidationReport",
+  "type": "object",
+  "required": ["verdict", "metrics", "comparison"],
+  "properties": {
+    "verdict": {"type": "string", "enum": ["pass", "fail", "warn"]},
+    "metrics": {"type": "object", "additionalProperties": true},
+    "comparison": {"type": "object", "additionalProperties": true},
+    "reasons": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,27 @@
+review_payload:
+  required_fields:
+    - message
+    - recommended_action
+    - regime
+    - audit_trace_id
+    - plan
+    - tool_name
+  optional_fields:
+    - first_visible_handle
+    - user_request
+    - thread_id
+    - checkpoint_id
+    - run_id
+review_response:
+  required_fields:
+    - action
+  optional_fields:
+    - notes
+    - approved_tool_subset
+    - reviewer_id
+allowed_actions:
+  - continue
+  - constrained_continue
+  - replan
+  - human_handoff
+  - abort

@@ -1,0 +1,26 @@
+{
+  "payload": {
+    "user_query": "{{#sys.query#}}",
+    "retrieved_chunks": "{{#knowledge.retrieved_chunks#}}",
+    "retrieval_metadata": {
+      "grounding_confidence": "{{#sys.grounding_confidence#}}",
+      "reranker_disagreement": "{{#sys.reranker_disagreement#}}",
+      "index_age": "{{#sys.index_age#}}"
+    },
+    "context": {
+      "question_time_sensitivity": "{{#sys.question_time_sensitivity#}}"
+    },
+    "history_state": {
+      "recent_stale_warnings": "{{#sys.recent_stale_warnings#}}"
+    },
+    "resource_state": {
+      "retrieval_budget": "{{#sys.retrieval_budget#}}"
+    }
+  },
+  "options": {
+    "policy_profile": {
+      "profile_name": "default",
+      "deterministic_mode": true
+    }
+  }
+}

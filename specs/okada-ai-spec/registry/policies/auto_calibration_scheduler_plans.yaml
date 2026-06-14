@@ -1,0 +1,41 @@
+plans:
+  routing_guarded_daily:
+    profile_name: routing_default
+    spec_id: OKD-AI-005
+    adapter_type: routing
+    enabled: true
+    cadence_hours: 24
+    use_recent_audits: true
+    audit_limit: 120
+    calibration_scope: thresholds_and_weights
+    auto_run_calibration_lab: true
+    lab_suite_name: routing_replay_smoke
+    persist_lab_report: true
+    require_lab_gate: true
+    constraints:
+      max_threshold_delta: 0.2
+  rag_shadow_daily:
+    profile_name: rag_default
+    spec_id: OKD-AI-004
+    adapter_type: rag
+    enabled: true
+    cadence_hours: 24
+    use_recent_audits: true
+    audit_limit: 120
+    calibration_scope: thresholds_and_weights
+    shadow_after_proposal: true
+    auto_run_calibration_lab: true
+    lab_suite_name: rag_replay_smoke
+    persist_lab_report: true
+    require_lab_gate: false
+    constraints:
+      max_threshold_delta: 0.15
+  monitoring_review_weekly:
+    profile_name: monitoring_default
+    spec_id: OKD-AI-001
+    adapter_type: monitoring
+    enabled: true
+    cadence_hours: 168
+    use_recent_audits: true
+    audit_limit: 240
+    calibration_scope: thresholds

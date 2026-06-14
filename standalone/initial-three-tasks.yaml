@@ -1,0 +1,27 @@
+version: 1
+bundle_id: okada-ai-initial-three-tasks
+mode: standalone-dual-agent
+source_of_truth:
+  - registry/
+  - api/
+  - schemas/
+  - standalone/task-bundles/
+execution_order:
+  - task-01-kernel-contract-hardening
+  - task-02-litellm-e2e-hardening
+  - task-03-dify-rag-e2e-hardening
+tasks:
+  - id: task-01-kernel-contract-hardening
+    path: standalone/task-bundles/task-01-kernel-contract-hardening.md
+    depends_on: []
+  - id: task-02-litellm-e2e-hardening
+    path: standalone/task-bundles/task-02-litellm-e2e-hardening.md
+    depends_on:
+      - task-01-kernel-contract-hardening
+  - id: task-03-dify-rag-e2e-hardening
+    path: standalone/task-bundles/task-03-dify-rag-e2e-hardening.md
+    depends_on:
+      - task-01-kernel-contract-hardening
+human_comparison:
+  mode: visual-and-practical
+  strict_scoring: false

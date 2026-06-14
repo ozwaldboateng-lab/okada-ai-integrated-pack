@@ -1,0 +1,113 @@
+profiles:
+  routing_default:
+    adapter_type: routing
+    mode: guarded_auto_adopt
+    window:
+      strategy: request_or_time
+      min_requests: 500
+      max_age_hours: 12
+    mutable_parameters:
+      thresholds:
+        - T_clean
+        - T_contam
+        - promotion_threshold
+      weights:
+        - W_dom
+        - W_hist
+        - W_comp
+    immutable_parameters:
+      - hard_risk_block
+    adoption_gate:
+      min_utility_gain: 0.01
+      max_success_drop: 0.005
+      max_p95_latency_increase: 0.10
+      max_cost_increase: 0.05
+    rollback_gate:
+      utility_drop: 0.02
+      catastrophic_increase: 0.0
+  rag_default:
+    adapter_type: rag
+    mode: shadow_challenger
+    window:
+      strategy: request_or_time
+      min_requests: 300
+      max_age_hours: 24
+    mutable_parameters:
+      thresholds:
+        - T_clean
+        - T_contam
+        - abstain_threshold
+        - freshness_threshold
+      weights:
+        - W_dom
+        - W_hist
+        - W_comp
+    immutable_parameters:
+      - source_of_truth_priority
+    adoption_gate:
+      min_grounded_accuracy_gain: 0.01
+      max_abstain_increase: 0.03
+      max_latency_increase: 0.15
+    rollback_gate:
+      stale_answer_spike: 0.02
+  monitoring_default:
+    adapter_type: monitoring
+    mode: approval_gated
+    window:
+      strategy: time
+      max_age_days: 3
+    mutable_parameters:
+      thresholds:
+        - T_clean
+        - T_contam
+        - unsafe_threshold
+      weights:
+        - W_dom
+        - W_hist
+        - W_comp
+    immutable_parameters:
+      - severe_incident_floor
+    adoption_gate:
+      min_unsafe_detection_gain: 0.01
+      max_false_alert_increase: 0.02
+  drift_default:
+    adapter_type: drift
+    mode: approval_gated
+    window:
+      strategy: time
+      max_age_days: 7
+    mutable_parameters:
+      thresholds:
+        - T_clean
+        - T_contam
+        - retrain_threshold
+        - rollback_threshold
+      weights:
+        - W_dom
+        - W_hist
+        - W_comp
+    immutable_parameters:
+      - retrain_budget_cap
+    adoption_gate:
+      min_recovery_efficiency_gain: 0.01
+      max_false_retrain_increase: 0.02
+  agent_default:
+    adapter_type: agent
+    mode: suggest_only
+    window:
+      strategy: time
+      max_age_days: 14
+    mutable_parameters:
+      thresholds:
+        - T_clean
+        - T_contam
+        - escalation_threshold
+        - handoff_threshold
+      weights:
+        - W_dom
+        - W_hist
+        - W_comp
+    immutable_parameters:
+      - high_risk_action_lock
+    adoption_gate:
+      advisory_only: true
