@@ -129,7 +129,8 @@
       grid-column:2; grid-row:3;
       flex-direction:column; gap:6px; align-self:start;
     }
-    body.landscape .battle-actions button {width:100%;}
+    /* 横向きは縦積みになるので、5つ並んでも高さを食い過ぎないよう詰める */
+    body.landscape .battle-actions button {width:100%;padding:7px 10px;font-size:13px;letter-spacing:1px;}
     body.landscape .battle-info {
       grid-column:1 / span 2;
       grid-row:4;
@@ -638,6 +639,7 @@
     <div class="log" id="exploreLog">黄昏に沈む聖域の地下。前進すると、霧の生き物に出くわすことがある。</div>
     <div style="text-align:center;margin-top:10px;">
       <button class="key" id="bParty" style="max-width:220px;display:inline-block;width:100%;">隊列・装備</button>
+      <button class="key" id="bUseItem" style="max-width:220px;display:inline-block;width:100%;margin-top:8px;">道具を使う</button>
     </div>
   </div>
 
@@ -691,6 +693,7 @@
     <div class="shop-tabs">
       <button class="shop-tab active" data-tab="buy">買う</button>
       <button class="shop-tab" data-tab="sell">売る</button>
+      <button class="shop-tab" data-tab="item">道具</button>
     </div>
     <div class="town-gold">所持金 <span id="shopGold">0</span> G</div>
     <div id="shopList" class="shop-list"></div>
@@ -751,6 +754,8 @@
     <div class="battle-actions">
       <button id="bWait">待機</button>
       <button id="bSpell" style="display:none">魔法</button>
+      <button id="bBattleItem">道具</button>
+      <button id="bFlee">逃げる</button>
       <button id="bEndUnit" disabled>行動終了</button>
     </div>
     <div class="battle-info" id="battleInfo"></div>
@@ -1267,9 +1272,28 @@ const HIRABLE={
   },
 };
 
-// 所持品キーから表示名を引く。装備・キーアイテムのどちらでも解決できる。
+/* ===== 消費アイテム =====
+   装備でもキーアイテムでもない「使うと無くなる道具」。
+   inventory は装備と共用なので、種別の判定は EQUIP / ITEMS / KEY_ITEMS の
+   どのテーブルに載っているかで行う。 */
+const ITEMS={
+  herb:    {name:'傷薬',       price:40,  type:'heal',      pow:30, desc:'HP を 30 回復する'},
+  elixir:  {name:'霊薬',       price:150, type:'heal',      pow:90, desc:'HP を 90 回復する'},
+  dew:     {name:'聖泉の雫',   price:320, type:'heal_full',         desc:'HP を全回復する'},
+  feather: {name:'蘇生の羽',   price:500, type:'revive',            desc:'倒れた者を半分の HP で戻す'},
+  smoke:   {name:'煙玉',       price:120, type:'escape',            desc:'戦闘から必ず逃げられる'},
+};
+// 店に並べる順（ITEMS のキー順に依存させない）
+const ITEM_SHOP_ORDER=['herb','elixir','dew','feather','smoke'];
+
+// 所持品キーから表示名を引く。装備・道具・キーアイテムのいずれでも解決できる。
 function itemName(key){
-  return (EQUIP[key]&&EQUIP[key].name) || (KEY_ITEMS[key]&&KEY_ITEMS[key].name) || key;
+  return (EQUIP[key]&&EQUIP[key].name) || (ITEMS[key]&&ITEMS[key].name)
+      || (KEY_ITEMS[key]&&KEY_ITEMS[key].name) || key;
+}
+// 所持している消費アイテムのキー一覧（店の並び順）
+function ownedItemKeys(){
+  return ITEM_SHOP_ORDER.filter(k=>(inventory[k]||0)>0);
 }
 
 // キーアイテム：装備ではなく、雇用条件などに使う特殊なアイテム
@@ -2279,7 +2303,7 @@ function startBattle(isBoss, midbossKey){
     elHint.textContent='階段の番人。倒さねば先には進めない。';
   }else{
     elHead.textContent='― 霧の生き物が現れた！ ―';
-    elHint.textContent='自分の駒を選び、移動先か隣接した敵をタップ。';
+    elHint.textContent='駒を選び、移動先か敵をタップ。道具・逃走も選べる。';
   }
   drawBattle(); renderInfo();
 }
@@ -2413,6 +2437,17 @@ function drawBattle(){
       bctx.fillRect(bx,by,bw*Math.max(0,u.hp)/u.maxhp,2);
     }
   });
+
+  // キーボード操作中だけ、選択マスを示すカーソルを重ねる
+  if(cursorVisible && phase==='player'){
+    const px=BOFFX+cursor.x*TILE, py=BOFFY+cursor.y*TILE;
+    bctx.save();
+    bctx.strokeStyle='#ffcf4a'; bctx.lineWidth=2;
+    bctx.strokeRect(px+2, py+2, TILE-4, TILE-4);
+    bctx.strokeStyle='rgba(255,207,74,.45)'; bctx.lineWidth=1;
+    bctx.strokeRect(px+5, py+5, TILE-10, TILE-10);
+    bctx.restore();
+  }
 }
 const var_amber='#ffcf4a';
 
@@ -3081,6 +3116,14 @@ bCanvas.addEventListener('click',e=>{
   const gx=Math.floor((mx-BOFFX)/TILE);
   const gy=Math.floor((my-BOFFY)/TILE);
   if(gx<0||gy<0||gx>=BG||gy>=BH_) return;
+  cursorVisible=false;   // ポインタ操作に切り替わったらカーソルは隠す
+  handleCell(gx,gy);
+});
+
+// マスを1つ「決定」した時の処理。タップ／クリックとキーボードの両方から呼ぶ。
+function handleCell(gx,gy){
+  if(phase!=='player') return;
+  if(gx<0||gy<0||gx>=BG||gy>=BH_) return;
 
   const o=occupant(gx,gy);
 
@@ -3144,6 +3187,53 @@ bCanvas.addEventListener('click',e=>{
   }
   // 駒を選び直す
   if(o && o.side==='ally'){ selectUnit(o); }
+}
+
+/* ---- キーボードでの戦闘操作（PC向け） ----
+   矢印/WASD でカーソル移動、Enter/Space で決定。タップと同じ handleCell を通す。 */
+let cursor={x:Math.floor(BG/2), y:BH_-2};
+let cursorVisible=false;
+function moveCursor(dx,dy){
+  cursorVisible=true;
+  cursor.x=Math.min(BG-1, Math.max(0, cursor.x+dx));
+  cursor.y=Math.min(BH_-1, Math.max(0, cursor.y+dy));
+  drawBattle();
+}
+// 未行動の味方を順に選び、カーソルをそこへ移す
+function cycleAlly(){
+  const list=units.filter(u=>u.side==='ally'&&u.alive&&!u.acted);
+  if(list.length===0) return;
+  const cur=list.indexOf(selected);
+  const next=list[(cur+1)%list.length];
+  cursorVisible=true;
+  cursor.x=next.x; cursor.y=next.y;
+  selectUnit(next);
+}
+window.addEventListener('keydown',e=>{
+  if(!isViewOpen(elBattleView)) return;
+  if(getComputedStyle(elSpellChoiceDialog).display!=='none') return;
+  if(overlay.style.display==='flex'){
+    // 戦闘結果の表示中は Enter / Space で閉じる
+    if(e.key==='Enter'||e.key===' '){ document.getElementById('overlayBtn').click(); e.preventDefault(); }
+    return;
+  }
+  if(phase!=='player') return;
+  switch(e.key){
+    case 'ArrowUp':    case 'w': moveCursor(0,-1); e.preventDefault(); break;
+    case 'ArrowDown':  case 's': moveCursor(0, 1); e.preventDefault(); break;
+    case 'ArrowLeft':  case 'a': moveCursor(-1,0); e.preventDefault(); break;
+    case 'ArrowRight': case 'd': moveCursor( 1,0); e.preventDefault(); break;
+    case 'Enter': case ' ':
+      cursorVisible=true; handleCell(cursor.x, cursor.y); e.preventDefault(); break;
+    case 'Tab':
+      cycleAlly(); e.preventDefault(); break;
+    case 'Escape':
+      if(spellAiming || selected){ clearSelection(); drawBattle(); }
+      e.preventDefault(); break;
+    case 'q': elWait.click(); e.preventDefault(); break;
+    case 'e': elEndUnit.click(); e.preventDefault(); break;
+    case 'r': if(elSpell.style.display!=='none') elSpell.click(); e.preventDefault(); break;
+  }
 });
 
 elEndUnit.onclick=endUnitTurn;
@@ -3177,8 +3267,192 @@ function activateSpell(sp){
 }
 const elSpellChoiceDialog=document.getElementById('spellChoiceDialog');
 const elSpellChoiceList=document.getElementById('spellChoiceList');
+// 選択ダイアログは魔法・覚醒・道具で使い回す。見出しは開いた側が設定し、
+// 閉じるときは必ず既定へ戻す（戻し忘れると次に開いた時の見出しが残る）。
+function setChoiceTitle(text){
+  elSpellChoiceDialog.querySelector('.confirm-msg').textContent = text || '使用する魔法を選ぶ';
+}
+function closeChoiceDialog(){
+  elSpellChoiceDialog.style.display='none';
+  setChoiceTitle();
+}
+// 選択肢ボタンを1つ作る（見出し＋小さな説明）
+function choiceButton(title, desc, onPick){
+  const b=document.createElement('button');
+  b.className='key';
+  b.style.padding='10px';
+  b.innerHTML=`<div style="font-weight:700">${title}</div>`+
+    (desc?`<div style="font-size:11px;color:#8a7d5e;letter-spacing:1px;margin-top:2px">${desc}</div>`:'');
+  b.onclick=onPick;
+  return b;
+}
+
+/* ===== 道具を使う =====
+   探索中は party / 同行者に、戦闘中は ally ユニットに対して使う。
+   対象が不適切（満タン・戦闘不能など）なら null を返し、消費しない。 */
+function applyItemToHp(it, cur, max){
+  if(it.type==='heal')      return Math.min(max, cur + it.pow);
+  if(it.type==='heal_full') return max;
+  return cur;
+}
+function useItemOnMember(key, m){      // 探索中の対象（party / 同行者）
+  const it=ITEMS[key]; if(!it) return null;
+  const max=effStats(m).maxhp;
+  if(it.type==='heal'||it.type==='heal_full'){
+    if(m.hp<=0 || m.hp>=max) return null;
+    const before=m.hp;
+    m.hp=applyItemToHp(it, m.hp, max);
+    return `${m.name} の HP が ${m.hp-before} 回復した。`;
+  }
+  if(it.type==='revive'){
+    if(m.hp>0) return null;
+    m.hp=Math.max(1, Math.floor(max*0.5));
+    return `${m.name} が息を吹き返した。`;
+  }
+  return null;
+}
+function useItemOnUnit(key, u){        // 戦闘中の対象（ally ユニット）
+  const it=ITEMS[key]; if(!it) return null;
+  if(it.type==='heal'||it.type==='heal_full'){
+    if(!u.alive || u.hp>=u.maxhp) return null;
+    const before=u.hp;
+    u.hp=applyItemToHp(it, u.hp, u.maxhp);
+    if(u.ref) u.ref.hp=u.hp;
+    return `${u.name} の HP が ${u.hp-before} 回復した。`;
+  }
+  if(it.type==='revive'){
+    if(u.alive) return null;
+    u.alive=true;
+    u.hp=Math.max(1, Math.floor(u.maxhp*0.5));
+    if(u.ref) u.ref.hp=u.hp;
+    return `${u.name} が息を吹き返した。`;
+  }
+  return null;
+}
+// その道具をその対象に使えるか（使えない相手をボタンに出さないため）
+function canUseItemOn(key, cur, max, alive){
+  const it=ITEMS[key]; if(!it) return false;
+  if(it.type==='revive') return !alive || cur<=0;
+  if(it.type==='heal'||it.type==='heal_full') return (alive && cur>0) && cur<max;
+  return false;
+}
+
+// 道具一覧 → 対象一覧、の2段ダイアログ。where は 'explore' か 'battle'。
+function openItemChoice(where){
+  const keys=ownedItemKeys().filter(k=> where==='battle' || ITEMS[k].type!=='escape');
+  elSpellChoiceList.innerHTML='';
+  setChoiceTitle('使う道具を選ぶ');
+  if(keys.length===0){
+    const none=document.createElement('div');
+    none.style.cssText='font-size:12px;color:#8a7d5e;letter-spacing:1px;padding:6px 2px;';
+    none.textContent = where==='battle' ? '使える道具を持っていない。' : '道具を持っていない。';
+    elSpellChoiceList.appendChild(none);
+  }
+  keys.forEach(key=>{
+    const it=ITEMS[key];
+    elSpellChoiceList.appendChild(choiceButton(
+      `${it.name}　×${inventory[key]}`, it.desc,
+      ()=>{ closeChoiceDialog(); pickItemTarget(key, where); }
+    ));
+  });
+  elSpellChoiceDialog.style.display='flex';
+}
+
+function pickItemTarget(key, where){
+  const it=ITEMS[key];
+  // 煙玉は対象を取らない（戦闘中のみ）
+  if(it.type==='escape'){
+    if(where!=='battle') return;
+    removeItem(key);
+    elHint.textContent=`${it.name} を投げつけた。視界が白く濁る――`;
+    doFlee(true);
+    return;
+  }
+  // 対象候補を集める
+  const targets=[];
+  if(where==='battle'){
+    units.filter(u=>u.side==='ally').forEach(u=>{
+      if(canUseItemOn(key, u.hp, u.maxhp, u.alive))
+        targets.push({label:`${u.name}　HP ${Math.max(0,u.hp)}/${u.maxhp}`, apply:()=>useItemOnUnit(key,u)});
+    });
+  }else{
+    const members=[...party];
+    if(activeCompanion && hiredCompanions[activeCompanion]) members.push(hiredCompanions[activeCompanion]);
+    members.forEach(m=>{
+      const max=effStats(m).maxhp;
+      if(canUseItemOn(key, m.hp, max, m.hp>0))
+        targets.push({label:`${m.name}　HP ${Math.max(0,m.hp)}/${max}`, apply:()=>useItemOnMember(key,m)});
+    });
+  }
+  elSpellChoiceList.innerHTML='';
+  setChoiceTitle(`${it.name} を誰に使う`);
+  if(targets.length===0){
+    const none=document.createElement('div');
+    none.style.cssText='font-size:12px;color:#8a7d5e;letter-spacing:1px;padding:6px 2px;';
+    none.textContent = it.type==='revive' ? '倒れている者はいない。' : '傷ついている者はいない。';
+    elSpellChoiceList.appendChild(none);
+  }
+  targets.forEach(t=>{
+    elSpellChoiceList.appendChild(choiceButton(t.label, '', ()=>{
+      const msg=t.apply();
+      closeChoiceDialog();
+      if(!msg) return;                 // 使えなかった時は消費しない
+      removeItem(key);
+      SFX.heal();
+      if(where==='battle'){
+        elHint.textContent=msg;
+        // 道具の使用は選択中の駒の行動を消費する
+        if(selected && !selected.acted){
+          selected.acted=true;
+          clearSelection();
+          if(units.filter(u=>u.side==='ally'&&u.alive).every(u=>u.acted)) enemyPhase();
+        }
+        drawBattle(); renderInfo();
+      }else{
+        elExploreLog.textContent=msg;
+        refreshHud();
+      }
+    }));
+  });
+  elSpellChoiceDialog.style.display='flex';
+}
+
+/* ===== 逃げる =====
+   ボス・中ボス戦からは逃げられない。通常戦は7割で成功し、
+   失敗すると味方全員の行動を消費して敵フェイズに移る。 */
+function bossPresent(){
+  return units.some(u=>u.side==='foe'&&u.alive&&(u.boss||u.midboss));
+}
+function doFlee(guaranteed){
+  if(phase!=='player' && !guaranteed) return;
+  if(!guaranteed && bossPresent()){
+    elHint.textContent='この相手からは逃げられない。';
+    return;
+  }
+  if(guaranteed || Math.random()<0.7){
+    phase='done';
+    // 逃走時も戦闘中のHPを持ち帰る（同行者含む）
+    units.filter(u=>u.side==='ally'&&u.ref).forEach(u=>{ u.ref.hp=Math.max(0,u.hp); });
+    clearSelection();
+    hideView(elBattleView);
+    showView(elExploreView);
+    elExploreLog.textContent = guaranteed
+      ? '煙に紛れ、一行はその場を離れた。'
+      : '背を向けて走った。霧が足跡を消してゆく。';
+    drawDungeon(); refreshHud();
+  }else{
+    elHint.textContent='逃げそこねた！ 敵が回り込む。';
+    units.filter(u=>u.side==='ally'&&u.alive).forEach(u=>{ u.acted=true; });
+    clearSelection();
+    drawBattle(); renderInfo();
+    // 失敗の一文を読ませてから敵フェイズへ（即座に上書きされると気づけない）
+    setTimeout(()=>{ if(phase==='player') enemyPhase(); }, 800);
+  }
+}
+
 function openSpellChoice(spells){
   elSpellChoiceList.innerHTML='';
+  setChoiceTitle();
   spells.forEach((sp,i)=>{
     const b=document.createElement('button');
     b.className='key';
@@ -3199,13 +3473,23 @@ function openSpellChoice(spells){
   });
   elSpellChoiceDialog.style.display='flex';
 }
-document.getElementById('spellChoiceCancel').onclick=()=>{
-  elSpellChoiceDialog.style.display='none';
-};
+document.getElementById('spellChoiceCancel').onclick=closeChoiceDialog;
 elWait.onclick=()=>{
   if(selected){ endUnitTurn(); }
   else { elHint.textContent='行動する駒を選んでください。'; }
 };
+// 戦闘中の「道具」：行動可能な駒を選んでから使う
+document.getElementById('bBattleItem').onclick=()=>{
+  if(phase!=='player') return;
+  if(!selected || selected.acted){
+    elHint.textContent='道具を使う駒を先に選んでください。';
+    return;
+  }
+  openItemChoice('battle');
+};
+document.getElementById('bFlee').onclick=()=>doFlee(false);
+// 探索中の「道具を使う」
+document.getElementById('bUseItem').onclick=()=>openItemChoice('explore');
 
 /* ---- 敵フェイズ（最寄りの味方へ接近して攻撃） ---- */
 function enemyPhase(){
@@ -3361,6 +3645,11 @@ function endBattle(win){
     units.filter(u=>u.side==='foe').forEach(foe=>{
       const key=rollDrop(foe);
       if(key){ addItem(key); got.push(key); }
+      // 装備とは別枠で、道具が少しだけ落ちる（枯渇して詰まないための保険）
+      if(Math.random() < (foe.boss||foe.midboss ? 0.5 : 0.12)){
+        const drop = (foe.boss||foe.midboss) ? 'elixir' : 'herb';
+        addItem(drop); got.push(drop);
+      }
       // キーアイテム抽選（中ボス等が固有で持つ）
       if(foe.keyItemDrop){
         Object.keys(foe.keyItemDrop).forEach(kk=>{
@@ -3382,8 +3671,8 @@ function endBattle(win){
       html+='<div class="drop-title" style="margin-top:8px;">戦利品</div>';
       Object.keys(count).forEach(k=>{
         const e=EQUIP[k];
-        const tag=e.relic?'◆ ':'';
-        html+=`<div class="drop-item">${tag}${e.name}${count[k]>1?' ×'+count[k]:''} を手に入れた</div>`;
+        const tag=(e&&e.relic)?'◆ ':'';
+        html+=`<div class="drop-item">${tag}${itemName(k)}${count[k]>1?' ×'+count[k]:''} を手に入れた</div>`;
       });
     }
     if(gotKeys.length){
@@ -3465,6 +3754,13 @@ document.getElementById('overlayBtn').onclick=()=>{
 };
 
 function renderInfo(){
+  // 逃走可否は盤面で変わる（番人を倒せば逃げられるようになる）
+  const fleeBtn=document.getElementById('bFlee');
+  if(fleeBtn){
+    const locked=bossPresent();
+    fleeBtn.disabled=locked;
+    fleeBtn.textContent=locked?'逃げられない':'逃げる';
+  }
   elInfo.innerHTML='';
   units.forEach(u=>{
     const d=document.createElement('div');
@@ -3711,7 +4007,7 @@ function visitChurch(){
 function openClassUpDialog(candidates){
   elSpellChoiceList.innerHTML='';
   // タイトル変更
-  elSpellChoiceDialog.querySelector('.confirm-msg').textContent='覚醒の儀式 — 誰を導きますか';
+  setChoiceTitle('覚醒の儀式 — 誰を導きますか');
   candidates.forEach(m=>{
     const up=CLASS_UP[m.cls];
     const fee=m.level*up.priceFactor;
@@ -3720,9 +4016,7 @@ function openClassUpDialog(candidates){
     b.innerHTML=`<div style="font-weight:700">${m.name}（${m.cls} Lv.${m.level}）</div><div style="font-size:11px;color:#8a7d5e;letter-spacing:1px;margin-top:2px">${up.next} へ覚醒　${fee} G</div>`;
     b.style.padding='10px';
     b.onclick=()=>{
-      elSpellChoiceDialog.style.display='none';
-      // タイトル元に戻す
-      elSpellChoiceDialog.querySelector('.confirm-msg').textContent='使用する魔法を選ぶ';
+      closeChoiceDialog();
       askConfirm(`${m.name} を ${up.next} に導きます。\n供物 ${fee} G。よろしいですか？`, ()=>{
         if(!spendGold(fee)){
           elTownLog.textContent=`供物が足らぬ。あと ${fee-gold} G。`;
@@ -3743,8 +4037,7 @@ function openClassUpDialog(candidates){
   skipBtn.innerHTML=`<div style="font-weight:700">儀式を行わない</div><div style="font-size:11px;color:#8a7d5e;margin-top:2px">（セーブする）</div>`;
   skipBtn.style.padding='10px';
   skipBtn.onclick=()=>{
-    elSpellChoiceDialog.style.display='none';
-    elSpellChoiceDialog.querySelector('.confirm-msg').textContent='使用する魔法を選ぶ';
+    closeChoiceDialog();
     // セーブダイアログへ
     const ts=saveTimestamp();
     const msg = ts ? `旅を記録しますか？\n（前回の記録: ${ts}）` : '旅を記録しますか？';
@@ -3958,7 +4251,7 @@ function renderShop(){
         <button data-key="${key}" data-act="buy" ${gold<e.price?'disabled':''}>買う</button>`;
       elShopList.appendChild(row);
     });
-  }else{
+  }else if(shopMode==='sell'){
     // 売る対象：所持品か、装備中のもの（遺物以外）
     const sellable={};
     // 所持品には「忍びの結び文」等のキーアイテムも入る。これらは EQUIP に無いので
@@ -3995,12 +4288,27 @@ function renderShop(){
         <button data-key="${key}" data-act="sell" ${stock<=0?'disabled':''}>売る</button>`;
       elShopList.appendChild(row);
     });
+  }else if(shopMode==='item'){
+    // 消費アイテムは在庫無制限。所持数を添えて並べる。
+    ITEM_SHOP_ORDER.forEach(key=>{
+      const it=ITEMS[key];
+      const owned=inventory[key]||0;
+      const row=document.createElement('div'); row.className='shop-item';
+      row.innerHTML=`
+        <div class="si-info">
+          <div class="si-name">${it.name}${owned?`　<span style="font-size:11px;color:#8a7d5e;">所持 ${owned}</span>`:''}</div>
+          <div class="si-mods">${it.desc}</div>
+        </div>
+        <div class="si-price">${it.price} G</div>
+        <button data-key="${key}" data-act="buy" ${gold<it.price?'disabled':''}>買う</button>`;
+      elShopList.appendChild(row);
+    });
   }
   // ボタンのイベント
   elShopList.querySelectorAll('button[data-key]').forEach(btn=>{
     btn.onclick=()=>{
       const key=btn.dataset.key, act=btn.dataset.act;
-      const e=EQUIP[key];
+      const e=EQUIP[key]||ITEMS[key];   // 道具タブでは ITEMS 側を引く
       if(act==='buy'){
         if(!spendGold(e.price)){ elShopLog.textContent=`所持金が足らぬ。あと ${e.price-gold} G。`; return; }
         addItem(key);
