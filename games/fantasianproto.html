@@ -2088,6 +2088,68 @@ let spellTargets=[];   // 魔法の射程内の敵
 let spellChoiceIdx=0;  // 選択中の魔法インデックス（spellsの中の位置）
 let spellAreaCells=[]; // 範囲魔法の効果範囲ハイライト（{x,y}の配列）
 
+/* ===== 被弾エフェクト =====
+   剣・魔法・吐息・反撃のどれで受けたかに関わらず共通。
+   命中したマスで閃光と輪が弾け、増減量が上へ浮かんで消える。
+   drawBattle() が毎回描き直す都合上、効果は状態として持ち、
+   有効な間だけタイマーで drawBattle() を回す。 */
+const HITFX_FRAMES=14;          // 40ms × 14 ≒ 0.56秒
+let hitEffects=[];              // {x,y,frame,amount,kind}
+let hitFxTimer=null;
+function spawnHitFx(unit, amount, kind){
+  if(!unit) return;
+  hitEffects.push({x:unit.x, y:unit.y, frame:0, amount:Math.max(0,Math.round(amount||0)), kind:kind||'dmg'});
+  if(!hitFxTimer){
+    hitFxTimer=setInterval(()=>{
+      hitEffects.forEach(h=>h.frame++);
+      hitEffects=hitEffects.filter(h=>h.frame<HITFX_FRAMES);
+      drawBattle();
+      if(!hitEffects.length){ clearInterval(hitFxTimer); hitFxTimer=null; }
+    }, 40);
+  }
+  drawBattle();
+}
+function drawHitEffects(){
+  hitEffects.forEach(h=>{
+    const t=h.frame/HITFX_FRAMES;                  // 0 → 1
+    const px=BOFFX+h.x*TILE, py=BOFFY+h.y*TILE;
+    const cx=px+TILE/2, cy=py+TILE/2;
+    const heal=(h.kind==='heal');
+    bctx.save();
+    // 着弾の閃光（最初の数フレームだけ強く光る）
+    if(h.frame<4){
+      const a=0.8*(1-h.frame/4);
+      const g=bctx.createRadialGradient(cx,cy,0,cx,cy,TILE*0.62);
+      g.addColorStop(0,   heal?`rgba(238,255,238,${a})`      :`rgba(255,255,255,${a})`);
+      g.addColorStop(0.45,heal?`rgba(120,220,140,${a*0.75})` :`rgba(255,140,100,${a*0.8})`);
+      g.addColorStop(1,'rgba(255,255,255,0)');
+      bctx.fillStyle=g;
+      bctx.beginPath(); bctx.arc(cx,cy,TILE*0.62,0,Math.PI*2); bctx.fill();
+    }
+    // 外へ弾ける輪
+    bctx.globalAlpha=Math.max(0, 0.9-t*1.1);
+    bctx.strokeStyle=heal?'#8fe0a0':'#ff8a5c';
+    bctx.lineWidth=Math.max(1.5, TILE*0.07*(1-t));
+    bctx.beginPath(); bctx.arc(cx,cy,TILE*(0.22+t*0.5),0,Math.PI*2); bctx.stroke();
+    bctx.globalAlpha=1;
+    // 増減量：上へ浮かびながら消える
+    if(h.amount>0){
+      const rise=TILE*(0.15+t*0.75);
+      bctx.globalAlpha = t<0.7 ? 1 : Math.max(0,(1-t)/0.3);
+      bctx.textAlign='center'; bctx.textBaseline='middle';
+      bctx.font=`bold ${Math.round(TILE*0.44)}px "Shippori Mincho", serif`;
+      bctx.lineWidth=Math.max(2, TILE*0.06);
+      bctx.strokeStyle='rgba(20,14,10,.85)';
+      const label=(heal?'+':'')+h.amount;
+      bctx.strokeText(label, cx, cy-rise);
+      bctx.fillStyle=heal?'#b6f0bd':'#ffd9c2';
+      bctx.fillText(label, cx, cy-rise);
+      bctx.globalAlpha=1;
+    }
+    bctx.restore();
+  });
+}
+
 const ENEMY_POOL=[
   // B1〜B3：表層
   {name:'ゴブリン', hp:18,maxhp:18,atk:7,def:2,mov:3,rng:1,col:'#7bd14a',sprite:'goblin', rank:1},
@@ -2317,6 +2379,11 @@ function drawBattle(){
   bg.addColorStop(0,'#2b3138'); bg.addColorStop(0.5,'#343a40'); bg.addColorStop(1,'#272c31');
   bctx.fillStyle=bg; bctx.fillRect(0,0,bCanvas.width,bCanvas.height);
 
+  // 被弾直後だけ盤面をわずかに揺らす（背景は動かさないので端に隙間が出ない）
+  const shakeSrc=hitEffects.find(h=>h.frame<3 && h.kind!=='heal');
+  bctx.save();
+  if(shakeSrc) bctx.translate((shakeSrc.frame%2?-1:1)*TILE*0.06, 0);
+
   // 床（水彩タッチの石床：石灰色と霧青緑の中間色）
   const stoneA=['#7e8a86','#828c84','#79857f','#838b82'];
   const stoneB=['#6f7b78','#727d74','#6b7771','#747c73'];
@@ -2448,6 +2515,9 @@ function drawBattle(){
     bctx.strokeRect(px+5, py+5, TILE-10, TILE-10);
     bctx.restore();
   }
+
+  drawHitEffects();
+  bctx.restore();   // 揺れ用の translate を戻す
 }
 const var_amber='#ffcf4a';
 
@@ -2590,6 +2660,7 @@ function castSpell(target){
       const h=hits[i++];
       fireballFx(caster.x, caster.y, h.enemy.x, h.enemy.y, ()=>{
         h.enemy.hp-=h.dmg;
+        spawnHitFx(h.enemy, h.dmg, 'dmg');
         let msg=`${h.enemy.name} に ${h.dmg}`;
         if(h.enemy.hp<=0){ h.enemy.hp=0; h.enemy.alive=false; msg+=' 倒した！'; setTimeout(()=>SFX.fall(), 200); }
         elHint.textContent=`${sp.name}！ ${msg}`;
@@ -2626,6 +2697,7 @@ function castSpell(target){
       const amount=sp.pow + Math.floor(Math.random()*5-2);
       const before=ally.hp;
       ally.hp=Math.min(ally.maxhp, ally.hp+amount);
+      spawnHitFx(ally, ally.hp-before, 'heal');
       const gained=ally.hp-before;
       msgs.push(`${ally.name} +${gained}`);
       healFx(ally.x, ally.y);
@@ -2640,6 +2712,7 @@ function castSpell(target){
     const heal=sp.pow + Math.floor(Math.random()*5-2);
     const before=target.hp;
     target.hp=Math.min(target.maxhp, target.hp+heal);
+    spawnHitFx(target, target.hp-before, 'heal');
     const gained=target.hp-before;
     elHint.textContent=`${caster.name} の${sp.name}！ ${target.name} の HP が ${gained} 回復`;
     healFx(target.x, target.y);
@@ -2666,6 +2739,7 @@ function castSpell(target){
       const ally=allies[i++];
       const before=ally.hp;
       ally.hp=ally.maxhp;
+      spawnHitFx(ally, ally.hp-before, 'heal');
       const gained=ally.hp-before;
       msgs.push(`${ally.name} +${gained}`);
       healFx(ally.x, ally.y);
@@ -2687,6 +2761,7 @@ function castSpell(target){
   elHint.textContent=`${caster.name} の${sp.name}！`;
   fireballFx(caster.x, caster.y, target.x, target.y, ()=>{
     target.hp-=dmg;
+    spawnHitFx(target, dmg, 'dmg');
     let msg=`${caster.name} の${sp.name}！ ${target.name} に ${dmg} ダメージ`;
     if(slaySpellFlash) msg+=`（竜の鱗を貫く）`;
     if(target.hp<=0){ target.hp=0; target.alive=false; msg+=` ── ${target.name} を倒した！`; setTimeout(()=>SFX.fall(), 200); }
@@ -3070,6 +3145,7 @@ function damage(attacker,target){
   }
   const dmg=Math.max(1, atk - target.def + Math.floor(Math.random()*5-2));
   target.hp-=dmg;
+  spawnHitFx(target, dmg, 'dmg');
   SFX.attack();
   setTimeout(()=>SFX.hit(), 80);
   let msg=`${attacker.name} の攻撃！ ${target.name} に ${dmg} ダメージ`;
@@ -3088,6 +3164,7 @@ function damage(attacker,target){
     setTimeout(()=>{
       const cdmg=Math.max(1, target.atk - attacker.def + Math.floor(Math.random()*5-2));
       attacker.hp-=cdmg;
+      spawnHitFx(attacker, cdmg, 'dmg');
       SFX.attack();
       let cmsg=`${target.name} の反撃！ ${attacker.name} に ${cdmg} ダメージ`;
       if(attacker.hp<=0){ attacker.hp=0; attacker.alive=false; cmsg+=` ── ${attacker.name} を倒した！`; setTimeout(()=>SFX.fall(),200); }
@@ -3318,6 +3395,7 @@ function useItemOnUnit(key, u){        // 戦闘中の対象（ally ユニット
     const before=u.hp;
     u.hp=applyItemToHp(it, u.hp, u.maxhp);
     if(u.ref) u.ref.hp=u.hp;
+    spawnHitFx(u, u.hp-before, 'heal');
     return `${u.name} の HP が ${u.hp-before} 回復した。`;
   }
   if(it.type==='revive'){
@@ -3325,6 +3403,7 @@ function useItemOnUnit(key, u){        // 戦闘中の対象（ally ユニット
     u.alive=true;
     u.hp=Math.max(1, Math.floor(u.maxhp*0.5));
     if(u.ref) u.ref.hp=u.hp;
+    spawnHitFx(u, u.hp, 'heal');
     return `${u.name} が息を吹き返した。`;
   }
   return null;
@@ -3534,6 +3613,7 @@ function enemyPhase(){
           if(f.spell.type==='breath') SFX.fire(); else SFX.fire();
           fx(f.x, f.y, target.x, target.y, ()=>{
             target.hp-=dmg;
+            spawnHitFx(target, dmg, 'dmg');
             let msg=`${f.name} の${f.spell.name}！ ${target.name} に ${dmg} ダメージ`;
             if(target.hp<=0){ target.hp=0; target.alive=false; msg+=` ── ${target.name} は倒れた！`; setTimeout(()=>SFX.fall(), 200); }
             elHint.textContent=msg;
