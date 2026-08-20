@@ -185,7 +185,152 @@
     body.landscape #prologueView > div[style*="text-align:center"] {
       grid-column:2; margin-top:8px !important;
     }
-  
+
+  /* ======== PC：横長の全画面レイアウト ========
+     body.desktop（幅が広く、かつ高さにも余裕がある画面）で適用。
+     横向きスマホ用の body.landscape とは別系統にして、
+     スマホ側の見え方に影響を与えないようにしている。
+     キャンバスは「使える高さ」から逆算して幅を頭打ちにするので、
+     ウィンドウをどう変えても盤面がはみ出さない。 */
+  body.desktop{padding:18px;}
+  body.desktop #machine{
+    max-width:1440px; width:100%;
+    padding:14px 22px 18px;
+    /* 高さは中身なり。町のように内容が短い画面で
+       下半分が空白になるのを避ける（縦位置は body 側の auto マージンが中央へ寄せる） */
+  }
+  body.desktop .titlebar{padding:2px 0 10px;margin-bottom:10px;}
+  body.desktop .titlebar h1{font-size:22px;letter-spacing:10px;margin:0;}
+  body.desktop .titlebar .en{font-size:11px;letter-spacing:4px;}
+  body.desktop .foot{margin-top:14px;}
+
+  /* ---- 探索：左に迷宮、右に情報と操作 ---- */
+  body.desktop #exploreView.on{
+    display:grid;
+    /* 迷宮の幅は高さで決まるので、左カラムは中身なりに縮める。
+       grid 全体を中央に寄せると左右の余白が揃う */
+    grid-template-columns: minmax(0,1fr) 320px;
+    grid-template-rows: auto auto auto;
+    gap:12px 24px;
+    align-items:start;
+    /* 迷宮の幅は高さで決まる。グリッド全体をその合計幅に抑えて中央へ置くと、
+       左カラムに余白が余らず左右のバランスが揃う */
+    max-width:calc((100vh - 360px) * 1.6 + 344px);
+    margin-left:auto; margin-right:auto;
+  }
+  body.desktop #exploreView > .crt{
+    grid-column:1; grid-row:1; margin:0;
+    width:100%;
+    /* 迷宮ビューは 480x300（横:縦 = 1.6）。高さから幅の上限を決める */
+    max-width:calc((100vh - 360px) * 1.6);
+  }
+  body.desktop #exploreView > .crt canvas{width:100%;height:auto;display:block;}
+  body.desktop #exploreView > .hud{
+    grid-column:2; grid-row:1;
+    flex-direction:column; gap:12px; margin:0;
+  }
+  body.desktop #exploreView > .hud .stat{font-size:14px;padding:12px 14px;}
+  body.desktop #exploreView > .hud .minimap-box{padding:12px;}
+  body.desktop #exploreView > .hud #minimap{width:170px;height:170px;}
+  body.desktop #exploreView > .pad{
+    grid-column:1; grid-row:2; margin:0 auto; max-width:340px; width:100%;
+  }
+  body.desktop #exploreView > .log{grid-column:1; grid-row:3; margin:0;}
+  /* 「隊列・装備」「道具を使う」は地図の下に続けて置く */
+  body.desktop #exploreView > div[style*="text-align:center"]{
+    grid-column:2; grid-row:2; margin-top:0 !important;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  body.desktop #exploreView > div[style*="text-align:center"] > button{
+    max-width:none !important; margin-top:0 !important;
+  }
+
+  /* ---- 戦闘：左に盤面、右にヒント・操作・ユニット一覧 ---- */
+  body.desktop #battleView.on{
+    display:grid;
+    grid-template-columns: minmax(0,1fr) 340px;
+    grid-template-rows: auto auto auto 1fr;
+    gap:10px 24px;
+    align-items:start;
+    max-width:calc(100vh - 190px + 364px);
+    margin-left:auto; margin-right:auto;
+  }
+  body.desktop .battle-head{grid-column:1 / span 2; grid-row:1; margin-bottom:2px;}
+  body.desktop #battleCanvasWrap{
+    grid-column:1; grid-row:2 / span 3; margin:0;
+    width:100%;
+    /* 盤面は 480x480 の正方形なので、高さがそのまま幅の上限になる */
+    max-width:calc(100vh - 190px);
+  }
+  body.desktop #battleCanvasWrap canvas{width:100%;height:auto;display:block;}
+  body.desktop #battleView > .hint{
+    grid-column:2; grid-row:2; margin:0; font-size:13px; line-height:1.7; padding:10px 12px;
+  }
+  body.desktop .battle-actions{
+    grid-column:2; grid-row:3; margin:0;
+    flex-direction:column; gap:8px;
+  }
+  body.desktop .battle-actions button{width:100%;padding:11px 12px;}
+  body.desktop .battle-info{
+    grid-column:2; grid-row:4; margin:0;
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;
+    align-content:start;
+  }
+  body.desktop .battle-info .unitcard{min-width:0;}
+
+  /* ---- 町：左に施設、右に風景と所持金 ---- */
+  body.desktop #townView.on{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px 26px;
+    align-items:start;
+  }
+  body.desktop .town-head{grid-column:1 / span 2;}
+  body.desktop .town-art{grid-column:2; grid-row:2 / span 3; margin:0; max-width:100%;}
+  body.desktop .town-buildings{grid-column:1; grid-row:2; margin:0; gap:10px;}
+  body.desktop .town-buildings .building{padding:12px 16px;}
+  body.desktop #townView .town-gold{grid-column:1; grid-row:3; margin:0;}
+  body.desktop #townView > div[style*="text-align:center"]{grid-column:1; grid-row:4; margin:0 !important;}
+  body.desktop #townView > .log{grid-column:1 / span 2; margin:0;}
+
+  /* ---- 一覧が主役の画面：中央に寄せて読みやすい幅に ---- */
+  body.desktop #shopView.on > *,
+  body.desktop #tavernView.on > *,
+  body.desktop #partyView.on > *{max-width:900px;margin-left:auto;margin-right:auto;}
+  body.desktop .shop-list{max-height:calc(100vh - 396px);}
+  body.desktop .tavern-list{max-height:calc(100vh - 330px);}
+  /* 装備パネルは横に2枚並べる */
+  body.desktop #partyList{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;
+    max-width:1100px;
+  }
+
+  /* ---- タイトル・プロローグ ---- */
+  body.desktop #titleView.on{min-height:calc(100vh - 130px);display:flex;align-items:center;justify-content:center;}
+  body.desktop .title-inner{width:100%;}
+  /* 広い画面ではタイトルまわりを一回り大きく */
+  body.desktop .title-en{font-size:16px;letter-spacing:9px;}
+  body.desktop .title-jp{font-size:60px;letter-spacing:24px;}
+  body.desktop .title-sub{font-size:15px;letter-spacing:4px;margin-bottom:40px;}
+  body.desktop .title-buttons{max-width:320px;}
+  /* 絵と本文は .prologue-inner の中にある。グリッドはそちらに掛ける
+     （#prologueView 直下は veil と inner の2つだけ） */
+  body.desktop #prologueView.on{min-height:auto; padding:26px 30px;}
+  body.desktop .prologue-inner{
+    display:grid;
+    grid-template-columns:minmax(0,480px) minmax(0,1fr);
+    grid-template-rows:auto auto;
+    gap:14px 36px; align-items:center;
+  }
+  body.desktop .prologue-art{grid-column:1; grid-row:1 / span 2; margin:0; max-width:100%;}
+  body.desktop .prologue-body{
+    grid-column:2; grid-row:1; max-width:none; text-align:left;
+    font-size:14px; line-height:2; margin:0;
+  }
+  body.desktop .prologue-inner > div[style*="text-align:center"]{
+    grid-column:2; grid-row:2; margin-top:0 !important; text-align:left !important;
+  }
+  body.desktop .prologue-inner > div[style*="text-align:center"] > button{margin:0;}
 
   .crt{
     position:relative;
@@ -4571,12 +4716,15 @@ loadSpriteImages();
 
 // 画面の縦横比に応じてレイアウトを切り替え（JSで判定するのでiOS制限の影響を受けない）
 function updateLandscape(){
-  // 横に長く、かつ縦が詰まっている時だけ2カラムに切り替える。
-  // 2カラムは「横向きスマホのように高さが足りない」状況を救うための配置なので、
-  // 高さに余裕のあるPCでは通常の1カラム（中央寄せ）のままにする。
-  const wide  = window.innerWidth > window.innerHeight * 1.2;
-  const short = window.innerHeight < 720;
+  // レイアウトは3種類。
+  //   landscape … 横向きスマホ。横に長いが高さが足りない
+  //   desktop   … PC。横に長く、高さにも余裕がある
+  //   （どちらでもない）… 縦持ちスマホ・タブレット。1カラム中央寄せ
+  const w=window.innerWidth, h=window.innerHeight;
+  const wide  = w > h * 1.2;
+  const short = h < 720;
   document.body.classList.toggle('landscape', wide && short);
+  document.body.classList.toggle('desktop',   wide && !short && w >= 1000);
 }
 updateLandscape();
 window.addEventListener('resize', updateLandscape);
