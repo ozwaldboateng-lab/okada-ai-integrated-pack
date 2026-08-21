@@ -31,6 +31,16 @@
      上書きしてしまうため、表示・非表示はクラスで切り替える。 */
   .view{display:none;}
   .view.on{display:block;}
+  /* 画面の切り替わりが一瞬すぎて場面転換に見えないので、短いフェードを挟む。
+     transform を使うのは .view 自身だけ（ダイアログは #machine 直下の別要素なので
+     position:fixed の基準がずれる心配はない） */
+  @keyframes viewIn{ from{opacity:0; transform:translateY(7px);} to{opacity:1; transform:none;} }
+  .view.on{animation:viewIn .22s ease-out both;}
+  /* 動きを控えたい設定の人には出さない */
+  @media (prefers-reduced-motion: reduce){
+    .view.on{animation:none;}
+    .hpbar i, .mpbar i{transition:none;}
+  }
   body{
     font-family:'Shippori Mincho',serif;
     color:var(--ink);
@@ -421,6 +431,11 @@
     user-select:none;
   }
   button.key:active{transform:translateY(2px);box-shadow:0 0 0 #b3a888;background:#d0c4ad;}
+  @media (hover:hover){
+    button.key:hover:not(:disabled){background:linear-gradient(180deg,#f5f0e4,#ded3bd);}
+    .battle-actions button:hover:not(:disabled){background:linear-gradient(180deg,#f5f0e4,#ded3bd);}
+    .building:hover{background:linear-gradient(180deg,#f5f0e4,#ded3bd);}
+  }
   button.key.empty{visibility:hidden;}
   .log{
     margin-top:12px;background:rgba(232,226,212,.55);
@@ -463,24 +478,37 @@
   #battleFoes{margin-top:0;margin-bottom:10px;}
   #battleFoes:empty{display:none;}
   .unitcard{
-    flex:1;min-width:100px;background:rgba(232,226,212,.62);
+    flex:1;min-width:104px;background:rgba(232,226,212,.62);
     border:1px solid var(--paper-edge);border-left:3px solid var(--dusk);
-    border-radius:3px;padding:7px 10px;line-height:1.6;
+    border-radius:3px;padding:6px 9px;line-height:1.45;
   }
   .unitcard.foe{border-left-color:var(--wine);}
-  .unitcard .nm{color:#3c3424;font-weight:700;}
-  .unitcard .sub{color:#8a7d5e;font-size:11px;}
-  .hpbar{height:5px;background:#cabf9e;border-radius:3px;margin-top:4px;overflow:hidden;}
-  .hpbar i{display:block;height:100%;background:var(--heal);}
+  .unitcard.down{opacity:.5;}
+  .unitcard .nm{
+    color:#3c3424;font-weight:700;font-size:13px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* 数値は折り返さない。「HP 70/70　MP」で改行されると読めない */
+  .unitcard .sub{
+    color:#8a7d5e;font-size:11px;letter-spacing:0;
+    display:flex;justify-content:space-between;gap:6px;white-space:nowrap;
+  }
+  .unitcard .sub .mp{color:#5d6b7a;}
+  .hpbar{height:5px;background:#cabf9e;border-radius:3px;margin-top:3px;overflow:hidden;}
+  .hpbar i{display:block;height:100%;background:var(--heal);transition:width .25s ease;}
   .unitcard.foe .hpbar i{background:var(--wine);}
+  .mpbar{height:3px;background:#c6c0ac;border-radius:2px;margin-top:2px;overflow:hidden;}
+  .mpbar i{display:block;height:100%;background:var(--dusk);transition:width .25s ease;}
   .battle-actions{
-    display:flex;gap:10px;margin-top:12px;justify-content:center;flex-wrap:wrap;
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;margin-top:12px;
   }
   .battle-actions button{
     font-family:'Shippori Mincho',serif;font-size:14px;color:#3c3424;
     background:linear-gradient(180deg,#efe9db,#d8cdb6);
-    border:1px solid var(--paper-edge);border-radius:4px;padding:11px 20px;cursor:pointer;
-    letter-spacing:2px;box-shadow:0 2px 0 #b3a888, inset 0 1px 0 rgba(255,255,255,.5);
+    border:1px solid var(--paper-edge);border-radius:4px;padding:11px 8px;cursor:pointer;
+    letter-spacing:1px;box-shadow:0 2px 0 #b3a888, inset 0 1px 0 rgba(255,255,255,.5);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .battle-actions button:active{transform:translateY(2px);box-shadow:0 0 0 #b3a888;}
   .battle-actions button:disabled{opacity:.4;cursor:default;}
@@ -1000,7 +1028,7 @@
     <div class="battle-info" id="battleInfo"></div>
   </div>
 
-  <div class="foot">RUISARD CODEX · ↑↓←→ / WASD でも操作可 · ver 1.0</div>
+  <div class="foot">RUISARD CODEX · ver 1.0</div>
 </div>
 
 <script>
@@ -2632,17 +2660,20 @@ function drawHitEffects(){
     bctx.lineWidth=Math.max(1.5, TILE*0.07*(1-t));
     bctx.beginPath(); bctx.arc(cx,cy,TILE*(0.22+t*0.5),0,Math.PI*2); bctx.stroke();
     bctx.globalAlpha=1;
-    // 増減量：上へ浮かびながら消える
+    // 増減量：上へ浮かびながら消える。
+    // 駒の頭上から出し、HPバーと重ならない高さまで上げる
     if(h.amount>0){
-      const rise=TILE*(0.15+t*0.75);
-      bctx.globalAlpha = t<0.7 ? 1 : Math.max(0,(1-t)/0.3);
+      const rise=TILE*(0.55+t*0.85);
+      const pop = t<0.18 ? 1+(0.18-t)*1.6 : 1;          // 出た瞬間だけ少し大きく
+      bctx.globalAlpha = t<0.65 ? 1 : Math.max(0,(1-t)/0.35);
       bctx.textAlign='center'; bctx.textBaseline='middle';
-      bctx.font=`bold ${Math.round(TILE*0.44)}px "Shippori Mincho", serif`;
-      bctx.lineWidth=Math.max(2, TILE*0.06);
-      bctx.strokeStyle='rgba(20,14,10,.85)';
+      bctx.font=`bold ${Math.round(TILE*0.60*pop)}px "Shippori Mincho", serif`;
+      bctx.lineJoin='round';
       const label=(heal?'+':'')+h.amount;
+      bctx.lineWidth=Math.max(3, TILE*0.13);
+      bctx.strokeStyle='rgba(14,10,8,.92)';
       bctx.strokeText(label, cx, cy-rise);
-      bctx.fillStyle=heal?'#b6f0bd':'#ffd9c2';
+      bctx.fillStyle=heal?'#c8ffcf':'#ffe6b0';
       bctx.fillText(label, cx, cy-rise);
       bctx.globalAlpha=1;
     }
@@ -2917,8 +2948,8 @@ function drawBattle(){
   if(shakeSrc) bctx.translate((shakeSrc.frame%2?-1:1)*TILE*0.06, 0);
 
   // 床（水彩タッチの石床：石灰色と霧青緑の中間色）
-  const stoneA=['#7e8a86','#828c84','#79857f','#838b82'];
-  const stoneB=['#6f7b78','#727d74','#6b7771','#747c73'];
+  const stoneA=['#828d89','#868f87','#7d8983','#879086'];
+  const stoneB=['#6e7a75','#717b73','#6a7570','#737c72'];
   for(let y=0;y<BH_;y++){
     for(let x=0;x<BG;x++){
       const px=BOFFX+x*TILE, py=BOFFY+y*TILE;
@@ -2927,17 +2958,16 @@ function drawBattle(){
       const base=alt?stoneA[(x+y)%4]:stoneB[(x*3+y)%4];
       // ベタ下塗り
       bctx.fillStyle=base; bctx.fillRect(px,py,TILE,TILE);
-      // 水彩の滲み（タイル内に色違いの溜まりを数個）
+      // 石の色ムラ。以前は滲みを重ねすぎて泥のように見えたので、薄く一度だけ
       const cx=px+TILE/2, cy=py+TILE/2;
-      wash(bctx,cx,cy,TILE*0.5,TILE*0.5, alt?'#8a9591':'#69756f', 0.18, rnd, 6);
-      wash(bctx,cx+(rnd()-0.5)*TILE*0.4, cy+(rnd()-0.5)*TILE*0.4, TILE*0.3,TILE*0.28,
-           rnd()>0.5?'#929c97':'#5f6b66', 0.14, rnd, 5);
-      // ほのかな苔（緑）をランダムに少しだけ
-      if(rnd()>0.7){
-        wash(bctx,px+rnd()*TILE,py+rnd()*TILE,TILE*0.18,TILE*0.16,'#6f7a55',0.16,rnd,4);
+      wash(bctx,cx+(rnd()-0.5)*TILE*0.3, cy+(rnd()-0.5)*TILE*0.3, TILE*0.34,TILE*0.30,
+           rnd()>0.5?'#9aa49f':'#6d7873', 0.10, rnd, 4);
+      // ほのかな苔（緑）をたまに
+      if(rnd()>0.84){
+        wash(bctx,px+rnd()*TILE,py+rnd()*TILE,TILE*0.16,TILE*0.14,'#6f7a55',0.14,rnd,3);
       }
-      // 目地（霧色のにじんだ線）
-      bctx.strokeStyle='rgba(60,70,72,.5)';
+      // 目地：石畳に見えるよう、はっきり刻む
+      bctx.strokeStyle='rgba(48,57,58,.62)';
       bctx.lineWidth=1;
       bctx.strokeRect(px+0.5,py+0.5,TILE,TILE);
       // 上辺うっすら明・下辺うっすら暗（控えめな立体）
@@ -3096,8 +3126,8 @@ function selectUnit(u){
     const any=spells.some(sp=>canAfford(u,sp));
     elSpell.style.display='';
     elSpell.disabled=!any;
-    elSpell.textContent = !any ? `魔力切れ（${u.mp}/${u.maxmp}）`
-      : (spells.length>1 ? `魔法を選ぶ（${u.mp}/${u.maxmp}）` : `魔法：${spells[0].name}（${spellCost(spells[0])}）`);
+    elSpell.textContent = !any ? '魔力切れ'
+      : (spells.length>1 ? `魔法 ${u.mp}` : `${spells[0].name} ${spellCost(spells[0])}`);
   }else{
     elSpell.style.display='none';
   }
@@ -4418,10 +4448,17 @@ function renderInfo(){
     const d=document.createElement('div');
     d.className='unitcard'+(u.side==='foe'?' foe':'');
     const pct=Math.max(0,u.hp)/u.maxhp*100;
-    const mp = (u.side==='ally' && u.maxmp) ? `　MP ${Math.max(0,u.mp)}/${u.maxmp}` : '';
-    d.innerHTML=`<div class="nm">${u.name}${u.alive?'':' ✕'}</div>
-      <div class="sub">${u.alive?('HP '+Math.max(0,u.hp)+'/'+u.maxhp+mp):'戦闘不能'}</div>
-      <div class="hpbar"><i style="width:${pct}%"></i></div>`;
+    if(!u.alive) d.className+=' down';
+    const hasMp = u.side==='ally' && u.maxmp>0;
+    const mpPct = hasMp ? Math.max(0,u.mp)/u.maxmp*100 : 0;
+    d.innerHTML=`<div class="nm">${u.name}${u.alive?'':' ✕'}</div>`
+      + (u.alive
+          ? `<div class="sub"><span>HP ${Math.max(0,u.hp)}/${u.maxhp}</span>`
+            + (hasMp?`<span class="mp">MP ${Math.max(0,u.mp)}/${u.maxmp}</span>`:'')
+            + `</div>`
+          : `<div class="sub"><span>戦闘不能</span></div>`)
+      + `<div class="hpbar"><i style="width:${pct}%"></i></div>`
+      + (hasMp?`<div class="mpbar"><i style="width:${mpPct}%"></i></div>`:'');
     (u.side==='foe'?elFoes:elInfo).appendChild(d);
   });
 }
