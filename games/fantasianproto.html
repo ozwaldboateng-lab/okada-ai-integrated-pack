@@ -1624,83 +1624,280 @@ const dCanvas=document.getElementById('dungeon');
 const dctx=dCanvas.getContext('2d');
 const DW=dCanvas.width, DH=dCanvas.height;
 
-// 各奥行きの「枠」スケール（0=手前の画面端 → 奥へ縮小）
-const SCALE=[1.0, 0.60, 0.36, 0.215, 0.13, 0.08];
-const MAXD=SCALE.length-1;
+/* ===== 投影 =====
+   1/z の真透視。視点はプレイヤーのマス中心、z は視線方向のマス単位の距離。
+   従来は 0.6^k の等比スケールで枠を縮めていたが、それだと手前が伸びず奥が
+   潰れすぎて「書き割り」に見えた。実際の遠近と同じ 1/z にすると、手前のマスが
+   大きく開き、遠いマスは消失点付近に密集する。 */
+const FOCAL   = 300;   // 焦点距離(px)。大きいほど画角が狭く、奥行きが強調される
+const HALF_W  = 0.5;   // 通路の半幅（マス単位）
+const CEIL_H  = 0.62;  // 目線から天井まで
+const FLOOR_H = 0.48;  // 目線から床まで（目線はやや低め）
+const MAXD    = 5;     // 見通せるマス数（深すぎると無限廊下に見える）
+const ZMIN    = 0.16;  // 視点直前のクリップ距離
+const VPX = DW/2, VPY = DH*0.5;          // 消失点
 
-function frame(k){
-  const hw=DW*0.5*SCALE[k], hh=DH*0.5*SCALE[k];
-  const cx=DW/2, cy=DH/2;
-  return {l:cx-hw, r:cx+hw, t:cy-hh, b:cy+hh};
-}
+function projX(x,z){ return VPX + FOCAL*x/z; }
+function projY(y,z){ return VPY - FOCAL*y/z; }
 
 function cellAt(x,y){
   if(x<0||y<0||x>=MW||y>=MH) return 1;
   return MAP[y][x];
 }
-
 function isWall(x,y){ return cellAt(x,y)===1; }
 
-// 奥行きkに応じて霧へフェードさせる色（石灰色ベース）
-function depthColor(base, k){
-  // base=[r,g,b], 奥(kが大)ほど霧色#9aa6a2へ寄せる
-  const fog=[154,166,162];
-  const t=Math.min(1, k/ (MAXD));
-  const m=0.15+0.7*t; // 手前は少しだけ霧、奥は強く
-  const r=Math.round(base[0]*(1-m)+fog[0]*m);
-  const g=Math.round(base[1]*(1-m)+fog[1]*m);
-  const b=Math.round(base[2]*(1-m)+fog[2]*m);
-  return `rgb(${r},${g},${b})`;
+/* ===== 陰影 =====
+   奥ほど暗く、かつ霧に溶ける。以前は奥ほど明るい霧色へ寄せていたため、
+   突き当りの壁が光って見えて奥行きが反転していた。 */
+const FOG_DEEP=[92,102,104];              // 奥は少し青みの冷たい霧
+const WARM=[0.12,0.02,-0.12];             // 灯りの色（手前ほど暖色に寄る）
+function shade(base, z, mul){
+  const lit  = 1/(1 + 0.16*z*z);          // 視点の灯り：距離の二乗で減衰
+  const fogT = Math.min(0.86, 1-Math.exp(-0.21*z));
+  const k    = (0.46 + 0.54*lit) * (mul===undefined?1:mul);
+  const c = i => Math.round(base[i]*k*(1+WARM[i]*lit)*(1-fogT) + FOG_DEEP[i]*fogT);
+  return `rgb(${c(0)},${c(1)},${c(2)})`;
+}
+// 目地の濃さも距離で薄める
+function jointStyle(z, a){
+  const t = Math.max(0.30, 1-z/(MAXD*0.75));
+  return `rgba(38,44,41,${(a*t).toFixed(3)})`;
+}
+
+const WALL_BASE  = [168,175,163];   // 突き当りの壁（正面から光が当たる）
+const SIDE_BASE  = [133,141,131];   // 側壁（斜めなので少し暗い）
+const FLOOR_BASE = [126,134,123];
+const CEIL_BASE  = [ 78, 85, 83];
+const COURSES    = 4;               // 石積みの段数（多すぎると方眼紙に見える）
+
+/* ---- 床のマス ---- */
+function paintFloorCell(zN, zF, seed){
+  const y=-FLOOR_H;
+  dctx.beginPath();
+  dctx.moveTo(projX(-HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zF), projY(y,zF));
+  dctx.lineTo(projX(-HALF_W,zF), projY(y,zF));
+  dctx.closePath();
+  const zm=(zN+zF)/2;
+  const rnd=mulberry32(seed);
+  // マス単位で単色に塗ると境目が段になる。奥行きに沿ってグラデーションで繋ぐ
+  const v=0.96+rnd()*0.08;
+  let fg=dctx.createLinearGradient(0,projY(y,zN),0,projY(y,zF));
+  fg.addColorStop(0,shade(FLOOR_BASE,zN,v)); fg.addColorStop(1,shade(FLOOR_BASE,zF,v));
+  dctx.fillStyle=fg;
+  dctx.fill();
+  dctx.save(); dctx.clip();
+  for(let i=0;i<3;i++){
+    wash(dctx, projX((rnd()-0.5),zm), projY(y,zm)-rnd()*8,
+         (projX(HALF_W,zm)-projX(-HALF_W,zm))*0.35, 10,
+         rnd()>0.5?shade(FLOOR_BASE,zm,1.15):shade(FLOOR_BASE,zm,0.8), 0.18, rnd, 4);
+  }
+  dctx.restore();
+  // 敷石の縦目地（消失点へ収束する）
+  dctx.strokeStyle=jointStyle(zm,0.42); dctx.lineWidth=1;
+  [-HALF_W/3, HALF_W/3].forEach(x=>{
+    dctx.beginPath();
+    dctx.moveTo(projX(x,zN), projY(y,zN));
+    dctx.lineTo(projX(x,zF), projY(y,zF));
+    dctx.stroke();
+  });
+  // マス境界の横目地
+  dctx.strokeStyle=jointStyle(zN,0.5); dctx.lineWidth=1.2;
+  dctx.beginPath();
+  dctx.moveTo(projX(-HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zN), projY(y,zN));
+  dctx.stroke();
+}
+
+/* ---- 天井のマス ---- */
+function paintCeilCell(zN, zF, seed){
+  const y=CEIL_H;
+  dctx.beginPath();
+  dctx.moveTo(projX(-HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zF), projY(y,zF));
+  dctx.lineTo(projX(-HALF_W,zF), projY(y,zF));
+  dctx.closePath();
+  const zm=(zN+zF)/2;
+  const rnd=mulberry32(seed^0x9e37);
+  const v=0.94+rnd()*0.12;
+  let cg=dctx.createLinearGradient(0,projY(y,zN),0,projY(y,zF));
+  cg.addColorStop(0,shade(CEIL_BASE,zN,v)); cg.addColorStop(1,shade(CEIL_BASE,zF,v));
+  dctx.fillStyle=cg;
+  dctx.fill();
+  // マス境界に梁を渡す
+  dctx.strokeStyle=jointStyle(zN,0.55); dctx.lineWidth=1.6;
+  dctx.beginPath();
+  dctx.moveTo(projX(-HALF_W,zN), projY(y,zN));
+  dctx.lineTo(projX( HALF_W,zN), projY(y,zN));
+  dctx.stroke();
+}
+
+/* ---- 側壁のマス ---- */
+function paintSideCell(zN, zF, side, seed){
+  const x=side*HALF_W;
+  dctx.beginPath();
+  dctx.moveTo(projX(x,zN), projY( CEIL_H,zN));
+  dctx.lineTo(projX(x,zF), projY( CEIL_H,zF));
+  dctx.lineTo(projX(x,zF), projY(-FLOOR_H,zF));
+  dctx.lineTo(projX(x,zN), projY(-FLOOR_H,zN));
+  dctx.closePath();
+  const zm=(zN+zF)/2;
+  const rnd=mulberry32(seed);
+  let sg=dctx.createLinearGradient(projX(x,zN),VPY,projX(x,zF),VPY);
+  sg.addColorStop(0,shade(SIDE_BASE,zN)); sg.addColorStop(1,shade(SIDE_BASE,zF));
+  dctx.fillStyle=sg;
+  dctx.fill();
+  dctx.save(); dctx.clip();
+  // 水彩の滲み（石の色ムラ）
+  for(let i=0;i<4;i++){
+    const zr=zN+(zF-zN)*rnd();
+    wash(dctx, projX(x,zr), projY((rnd()-0.4)*0.9, zr),
+         Math.abs(projX(x,zF)-projX(x,zN))*0.5+6, (projY(-FLOOR_H,zm)-projY(CEIL_H,zm))*0.16,
+         rnd()>0.5?shade(SIDE_BASE,zm,1.18):shade(SIDE_BASE,zm,0.78), 0.17, rnd, 4);
+  }
+  // 石積み：水平の段（消失点へ収束）と、段ごとに半個ずらした縦目地
+  const H=CEIL_H+FLOOR_H;
+  for(let i=0;i<COURSES;i++){
+    const y0=-FLOOR_H + H*i/COURSES;
+    const y1=-FLOOR_H + H*(i+1)/COURSES;
+    if(i>0){
+      dctx.strokeStyle=jointStyle(zm,0.5); dctx.lineWidth=1;
+      dctx.beginPath();
+      dctx.moveTo(projX(x,zN), projY(y0,zN));
+      dctx.lineTo(projX(x,zF), projY(y0,zF));
+      dctx.stroke();
+    }
+    const offs = (i%2) ? [1/6, 1/2, 5/6] : [1/3, 2/3];
+    dctx.strokeStyle=jointStyle(zm,0.42); dctx.lineWidth=1;
+    offs.forEach(fr=>{
+      const z=zN+(zF-zN)*fr;
+      dctx.beginPath();
+      dctx.moveTo(projX(x,z), projY(y0,z));
+      dctx.lineTo(projX(x,z), projY(y1,z));
+      dctx.stroke();
+    });
+  }
+  dctx.restore();
+  // マス境界の縦の稜線
+  dctx.strokeStyle=jointStyle(zN,0.55); dctx.lineWidth=1.2;
+  dctx.beginPath();
+  dctx.moveTo(projX(x,zN), projY( CEIL_H,zN));
+  dctx.lineTo(projX(x,zN), projY(-FLOOR_H,zN));
+  dctx.stroke();
+}
+
+/* ---- 横穴（側方が通路のとき） ----
+   何も描かないと背景がそのまま覗いて「geometry の抜け」に見える。
+   灯りの届かない脇道として、暗く落とした面を置き、縁に柱を立てる。 */
+function paintOpening(zN, zF, side){
+  const x=side*HALF_W;
+  dctx.beginPath();
+  dctx.moveTo(projX(x,zN), projY( CEIL_H,zN));
+  dctx.lineTo(projX(x,zF), projY( CEIL_H,zF));
+  dctx.lineTo(projX(x,zF), projY(-FLOOR_H,zF));
+  dctx.lineTo(projX(x,zN), projY(-FLOOR_H,zN));
+  dctx.closePath();
+  let og=dctx.createLinearGradient(projX(x,zN),VPY,projX(x,zF),VPY);
+  og.addColorStop(0,shade([46,53,54], zN, 0.9));
+  og.addColorStop(1,shade([56,64,65], zF, 0.9));
+  dctx.fillStyle=og;
+  dctx.fill();
+  // 手前側の柱（開口部の縁）
+  dctx.strokeStyle=jointStyle(zN,0.7); dctx.lineWidth=1.4;
+  dctx.beginPath();
+  dctx.moveTo(projX(x,zN), projY( CEIL_H,zN));
+  dctx.lineTo(projX(x,zN), projY(-FLOOR_H,zN));
+  dctx.stroke();
+}
+
+/* ---- 突き当りの壁（1枚の平面なので画面上も等間隔） ---- */
+function paintFrontWall(z, seed){
+  const l=projX(-HALF_W,z), r=projX(HALF_W,z);
+  const t=projY(CEIL_H,z),  b=projY(-FLOOR_H,z);
+  const w=r-l, h=b-t;
+  dctx.fillStyle=shade(WALL_BASE, z);
+  dctx.fillRect(l,t,w,h);
+  const rnd=mulberry32(seed);
+  dctx.save();
+  dctx.beginPath(); dctx.rect(l,t,w,h); dctx.clip();
+  for(let i=0;i<6;i++){
+    wash(dctx, l+rnd()*w, t+rnd()*h, w*0.26, h*0.2,
+         rnd()>0.5?shade(WALL_BASE,z,1.15):shade(WALL_BASE,z,0.8), 0.16, rnd, 5);
+  }
+  if(rnd()>0.4){  // 足元の苔
+    wash(dctx, l+rnd()*w, b-h*0.18, w*0.24, h*0.13, shade([104,116,80],z), 0.22, rnd, 4);
+  }
+  // 石積み
+  for(let i=0;i<COURSES;i++){
+    const y0=t+h*i/COURSES, y1=t+h*(i+1)/COURSES;
+    if(i>0){
+      dctx.strokeStyle=jointStyle(z,0.85); dctx.lineWidth=1;
+      dctx.beginPath(); dctx.moveTo(l,y0); dctx.lineTo(r,y0); dctx.stroke();
+    }
+    const offs = (i%2) ? [1/6,1/2,5/6] : [1/3,2/3];
+    dctx.strokeStyle=jointStyle(z,0.70); dctx.lineWidth=1;
+    offs.forEach(fr=>{
+      const xx=l+w*fr;
+      dctx.beginPath(); dctx.moveTo(xx,y0); dctx.lineTo(xx,y1); dctx.stroke();
+    });
+  }
+  dctx.restore();
+  // 天井際の受け光と、床際の影
+  dctx.fillStyle='rgba(226,230,222,.05)'; dctx.fillRect(l,t,w,Math.max(1,h*0.04));
+  dctx.fillStyle='rgba(18,22,20,.20)';    dctx.fillRect(l,b-Math.max(1,h*0.05),w,Math.max(1,h*0.05));
 }
 
 function drawDungeon(){
   dctx.clearRect(0,0,DW,DH);
-  const horizon=DH*0.46;
-  // 天井（暗い霧の石）
+  // 背景：天井は上ほど暗く、床は手前ほど明るい。消失点付近は霧の色に収束する
+  const horizon=VPY;
   let g=dctx.createLinearGradient(0,0,0,horizon);
-  g.addColorStop(0,'#2a2f31'); g.addColorStop(1,'#444b48');
+  g.addColorStop(0,'#262b2d'); g.addColorStop(1,'#5c645f');
   dctx.fillStyle=g; dctx.fillRect(0,0,DW,horizon);
-  // 床（くすんだ石灰）
   g=dctx.createLinearGradient(0,horizon,0,DH);
-  g.addColorStop(0,'#3f463f'); g.addColorStop(1,'#5a615a');
+  g.addColorStop(0,'#5c645f'); g.addColorStop(1,'#798176');
   dctx.fillStyle=g; dctx.fillRect(0,horizon,DW,DH-horizon);
-  // 床と天井に水彩の滲み
-  const rndF=mulberry32(player.x*131+player.y*17+player.dir*7);
-  for(let i=0;i<10;i++){
-    wash(dctx, rndF()*DW, horizon+rndF()*(DH-horizon), DW*0.12, DH*0.05,
-         rndF()>0.5?'#6a7268':'#4f564e', 0.10, rndF, 5);
-  }
 
   const fwd=DIRS[player.dir];
-  const left={dx:DIRS[(player.dir+3)%4].dx, dy:DIRS[(player.dir+3)%4].dy};
+  const left ={dx:DIRS[(player.dir+3)%4].dx, dy:DIRS[(player.dir+3)%4].dy};
   const right={dx:DIRS[(player.dir+1)%4].dx, dy:DIRS[(player.dir+1)%4].dy};
 
   let blockedAt=MAXD;
   for(let k=1;k<=MAXD;k++){
-    const cx=player.x+fwd.dx*k, cy=player.y+fwd.dy*k;
-    if(isWall(cx,cy)){ blockedAt=k; break; }
+    if(isWall(player.x+fwd.dx*k, player.y+fwd.dy*k)){ blockedAt=k; break; }
   }
 
+  // 奥から手前へ塗る（画家のアルゴリズム）
   for(let k=blockedAt;k>=0;k--){
     const cx=player.x+fwd.dx*k, cy=player.y+fwd.dy*k;
-    const fNear=frame(k);
-    const fFar = frame(Math.min(k+1,MAXD));
+    const zN=Math.max(ZMIN, k-0.5), zF=k+0.5;
+    const seed=Math.round((cx*73856093)^(cy*19349663)^(k*83492791));
     if(k>=1 && isWall(cx,cy)){
-      paintWall(fNear, true, k);
+      paintFrontWall(zN, seed);      // このマスは壁。手前側の面だけ見える
       continue;
     }
-    if(isWall(cx+left.dx, cy+left.dy)){
-      paintSide(fNear.l, fFar.l, fNear.t, fFar.t, fNear.b, fFar.b, 'L', k);
-    }
-    if(isWall(cx+right.dx, cy+right.dy)){
-      paintSide(fNear.r, fFar.r, fNear.t, fFar.t, fNear.b, fFar.b, 'R', k);
-    }
+    paintCeilCell(zN, zF, seed);
+    paintFloorCell(zN, zF, seed);
+    if(isWall(cx+left.dx,  cy+left.dy))  paintSideCell(zN, zF, -1, seed^0x1234);
+    else                                 paintOpening(zN, zF, -1);
+    if(isWall(cx+right.dx, cy+right.dy)) paintSideCell(zN, zF,  1, seed^0x5678);
+    else                                 paintOpening(zN, zF,  1);
   }
-  // 霧のビネット（四隅を霞ませる）
-  let mist=dctx.createRadialGradient(DW/2,DH*0.5,DW*0.2, DW/2,DH*0.5,DW*0.62);
-  mist.addColorStop(0,'rgba(154,166,162,0)');
-  mist.addColorStop(1,'rgba(150,160,158,.42)');
+
+  // 灯りの減衰：中央から離れるほど暗く落とす（松明を持って歩く感じ）
+  let vg=dctx.createRadialGradient(DW/2,DH*0.52,DW*0.14, DW/2,DH*0.52,DW*0.72);
+  vg.addColorStop(0,'rgba(20,25,23,0)');
+  vg.addColorStop(0.62,'rgba(20,25,23,.07)');
+  vg.addColorStop(1,'rgba(16,20,19,.30)');
+  dctx.fillStyle=vg; dctx.fillRect(0,0,DW,DH);
+  // 消失点あたりに薄い霧をためる
+  let mist=dctx.createRadialGradient(VPX,VPY,0, VPX,VPY,DW*0.30);
+  mist.addColorStop(0,'rgba(150,161,157,.13)');
+  mist.addColorStop(1,'rgba(150,161,157,0)');
   dctx.fillStyle=mist; dctx.fillRect(0,0,DW,DH);
+
   // 紙のグレイン
   const rndG=mulberry32(99);
   dctx.save();
@@ -1710,63 +1907,6 @@ function drawDungeon(){
     dctx.fillRect(rndG()*DW,rndG()*DH,1,1);
   }
   dctx.restore();
-}
-
-function paintWall(f, front, k){
-  const w=f.r-f.l, h=f.b-f.t;
-  dctx.fillStyle=depthColor([122,131,124], k);
-  dctx.fillRect(f.l, f.t, w, h);
-  const rnd=mulberry32(Math.round(f.l*7+f.t*13+k*101));
-  for(let i=0;i<8;i++){
-    wash(dctx, f.l+rnd()*w, f.t+rnd()*h, w*0.22, h*0.18,
-         rnd()>0.5?depthColor([138,146,138],k):depthColor([99,107,101],k), 0.16, rnd, 5);
-  }
-  if(rnd()>0.4){
-    wash(dctx, f.l+rnd()*w, f.b-h*0.2, w*0.2, h*0.12, depthColor([111,122,85],k), 0.2, rnd, 4);
-  }
-  dctx.strokeStyle=`rgba(50,56,52,${0.5-0.3*(k/MAXD)})`;
-  dctx.lineWidth=Math.max(1,w*0.012);
-  const rows=4;
-  for(let i=1;i<rows;i++){
-    const yy=f.t+h*i/rows;
-    dctx.beginPath();dctx.moveTo(f.l,yy);dctx.lineTo(f.r,yy);dctx.stroke();
-    const off=(i%2)?w*0.25:0;
-    for(let xx=f.l+off; xx<f.r; xx+=w*0.5){
-      dctx.beginPath();dctx.moveTo(xx,yy);dctx.lineTo(xx,yy-h/rows);dctx.stroke();
-    }
-  }
-  dctx.fillStyle='rgba(220,224,218,.12)';dctx.fillRect(f.l,f.t,w,h*0.04);
-  dctx.fillStyle='rgba(20,24,22,.22)';dctx.fillRect(f.l,f.b-h*0.04,w,h*0.04);
-}
-
-function paintSide(xNear,xFar,tNear,tFar,bNear,bFar,side,k){
-  dctx.beginPath();
-  dctx.moveTo(xNear,tNear);
-  dctx.lineTo(xFar,tFar);
-  dctx.lineTo(xFar,bFar);
-  dctx.lineTo(xNear,bNear);
-  dctx.closePath();
-  dctx.fillStyle=depthColor([92,99,93], k);
-  dctx.fill();
-  dctx.save();
-  dctx.clip();
-  const rnd=mulberry32(Math.round(xNear*5+tNear*11+k*53+(side==='L'?1:2)));
-  const x0=Math.min(xNear,xFar), x1=Math.max(xNear,xFar);
-  const y0=Math.min(tNear,tFar), y1=Math.max(bNear,bFar);
-  for(let i=0;i<6;i++){
-    wash(dctx, x0+rnd()*(x1-x0), y0+rnd()*(y1-y0), (x1-x0)*0.4, (y1-y0)*0.18,
-         rnd()>0.5?depthColor([104,112,105],k):depthColor([74,80,75],k), 0.16, rnd, 4);
-  }
-  if(rnd()>0.5){
-    wash(dctx, x0+rnd()*(x1-x0), y1-(y1-y0)*0.2, (x1-x0)*0.3, (y1-y0)*0.12, depthColor([95,105,72],k),0.18,rnd,3);
-  }
-  dctx.restore();
-  dctx.strokeStyle=`rgba(40,46,42,${0.45-0.25*(k/MAXD)})`;
-  dctx.lineWidth=1.2;
-  dctx.beginPath();
-  dctx.moveTo(xNear,tNear);dctx.lineTo(xFar,tFar);
-  dctx.moveTo(xNear,bNear);dctx.lineTo(xFar,bFar);
-  dctx.stroke();
 }
 
 /* ---------- 探索 操作 ---------- */
