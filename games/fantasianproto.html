@@ -110,7 +110,7 @@
     body.landscape #battleView.on {
       display:grid;
       grid-template-columns: minmax(0, 1fr) 280px;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto auto auto 1fr;
       gap:8px 12px;
       align-items:start;
     }
@@ -118,28 +118,35 @@
     /* 戦闘盤は正方形（480x480）なので、横幅を「使える高さ」で頭打ちにすると
        画面内に収まり、盤を見るためのスクロールが要らなくなる */
     body.landscape #battleCanvasWrap {
-      grid-column:1; grid-row:2 / span 2; margin:0;
+      grid-column:1; grid-row:2 / span 3; margin:0;
       max-width:calc(100vh - 96px); justify-self:center;
     }
     body.landscape #battleCanvasWrap canvas {width:100%;height:auto;display:block;}
     body.landscape #battleView > .hint {
-      grid-column:2; grid-row:2;
+      grid-column:2; grid-row:3;
       font-size:11px; line-height:1.5; margin:0;
       padding:6px 8px;
     }
     body.landscape .battle-actions {
-      grid-column:2; grid-row:3;
+      grid-column:2; grid-row:4;
       flex-direction:column; gap:6px; align-self:start;
     }
     /* 横向きは縦積みになるので、5つ並んでも高さを食い過ぎないよう詰める */
     body.landscape .battle-actions button {width:100%;padding:7px 10px;font-size:13px;letter-spacing:1px;}
     body.landscape .battle-info {
       grid-column:1 / span 2;
-      grid-row:4;
+      grid-row:5;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap:6px;
       font-size:11px;
     }
+    /* 敵のHPはサイドバー最上段（ヒントの上） */
+    body.landscape #battleFoes{
+      grid-column:2; grid-row:2; margin:0;
+      display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px;
+      font-size:10px;
+    }
+    body.landscape #battleFoes .unitcard{min-width:0;padding:4px 6px;line-height:1.4;}
     body.landscape .battle-info .card {padding:6px 8px;}
 
     /* 町画面：左右に建物リストと現在情報 */
@@ -251,7 +258,7 @@
   body.desktop #battleView.on{
     display:grid;
     grid-template-columns: minmax(0,1fr) 340px;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     gap:10px 24px;
     align-items:start;
     max-width:calc(100vh - 190px + 364px);
@@ -259,25 +266,27 @@
   }
   body.desktop .battle-head{grid-column:1 / span 2; grid-row:1; margin-bottom:2px;}
   body.desktop #battleCanvasWrap{
-    grid-column:1; grid-row:2 / span 3; margin:0;
+    grid-column:1; grid-row:2 / span 4; margin:0;
     width:100%;
     /* 盤面は 480x480 の正方形なので、高さがそのまま幅の上限になる */
     max-width:calc(100vh - 190px);
   }
   body.desktop #battleCanvasWrap canvas{width:100%;height:auto;display:block;}
   body.desktop #battleView > .hint{
-    grid-column:2; grid-row:2; margin:0; font-size:13px; line-height:1.7; padding:10px 12px;
+    grid-column:2; grid-row:3; margin:0; font-size:13px; line-height:1.7; padding:10px 12px;
   }
   body.desktop .battle-actions{
-    grid-column:2; grid-row:3; margin:0;
+    grid-column:2; grid-row:4; margin:0;
     flex-direction:column; gap:8px;
   }
   body.desktop .battle-actions button{width:100%;padding:11px 12px;}
   body.desktop .battle-info{
-    grid-column:2; grid-row:4; margin:0;
+    grid-column:2; grid-row:5; margin:0;
     display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;
     align-content:start;
   }
+  /* 敵のHPは操作パネル（ヒント）の上 */
+  body.desktop #battleFoes{grid-column:2; grid-row:2; margin:0;}
   body.desktop .battle-info .unitcard{min-width:0;}
 
   /* ---- 町：左に施設、右に風景と所持金 ---- */
@@ -427,6 +436,9 @@
   .battle-info{
     display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;font-size:12px;
   }
+  /* 敵のHPは盤面の上。味方より先に目に入る位置に置く */
+  #battleFoes{margin-top:0;margin-bottom:10px;}
+  #battleFoes:empty{display:none;}
   .unitcard{
     flex:1;min-width:100px;background:rgba(232,226,212,.62);
     border:1px solid var(--paper-edge);border-left:3px solid var(--dusk);
@@ -889,6 +901,7 @@
   <!-- ============ BATTLE ============ -->
   <div id="battleView" class="view">
     <div class="battle-head" id="battleHead">― 戦闘 ―</div>
+    <div class="battle-info" id="battleFoes"></div>
     <div class="crt" id="battleCanvasWrap">
       <canvas id="battle" width="480" height="480"></canvas>
       <div class="overlay" id="overlay">
@@ -2359,6 +2372,7 @@ const elBattleView=document.getElementById('battleView');
 const elExploreView=document.getElementById('exploreView');
 const elHint=document.getElementById('battleHint');
 const elInfo=document.getElementById('battleInfo');
+const elFoes=document.getElementById('battleFoes');
 const elHead=document.getElementById('battleHead');
 const elEndUnit=document.getElementById('bEndUnit');
 const elWait=document.getElementById('bWait');
@@ -4128,7 +4142,9 @@ function renderInfo(){
     fleeBtn.disabled=locked;
     fleeBtn.textContent=locked?'逃げられない':'逃げる';
   }
+  // 敵は盤面の上（PCは操作パネルの上）、味方はその下。別々のパネルに描く
   elInfo.innerHTML='';
+  elFoes.innerHTML='';
   units.forEach(u=>{
     const d=document.createElement('div');
     d.className='unitcard'+(u.side==='foe'?' foe':'');
@@ -4136,7 +4152,7 @@ function renderInfo(){
     d.innerHTML=`<div class="nm">${u.name}${u.alive?'':' ✕'}</div>
       <div class="sub">${u.alive?('HP '+Math.max(0,u.hp)+'/'+u.maxhp):'戦闘不能'}</div>
       <div class="hpbar"><i style="width:${pct}%"></i></div>`;
-    elInfo.appendChild(d);
+    (u.side==='foe'?elFoes:elInfo).appendChild(d);
   });
 }
 
