@@ -1999,39 +1999,18 @@ function paintCeilCell (zN,zF,seed){ paintPlaneY( CEIL_H,-HALF_W,HALF_W,zN,zF,CE
 function paintSideCell (zN,zF,side,seed){ paintPlaneX(side*HALF_W, zN, zF, seed); }
 function paintFrontWall(z,seed){ paintPlaneZ(z, -HALF_W, HALF_W, seed); }
 
-/* ---- 横穴（側方が通路のとき） ----
-   開口部は「窓」。その向こうに脇道の突き当り・床・天井・袖壁が見える。
-   窓の四角形でクリップしてから中身を描くと、覗き込んだ形になる。 */
-function paintOpening(zN, zF, side, cx, cy, sdx, sdy, fdx, fdy, seed){
-  const xIn = side*HALF_W;         // 通路と脇道の境（＝窓の位置）
-  const xOut= side*(HALF_W+1);     // 脇道の向こう側
-  dctx.save();
-  dctx.beginPath();
-  dctx.moveTo(projX(xIn,zN), projY( CEIL_H,zN));
-  dctx.lineTo(projX(xIn,zF), projY( CEIL_H,zF));
-  dctx.lineTo(projX(xIn,zF), projY(-FLOOR_H,zF));
-  dctx.lineTo(projX(xIn,zN), projY(-FLOOR_H,zN));
-  dctx.closePath();
-  dctx.clip();
+/* ---- 見えているマスを2次元で拾って描く ----
+   以前は「前方一直線の廊下＋横1マス」しか描いていなかったため、
+   脇道がL字に折れていると、その先が平らな暗い板になっていた。
+   周囲のマスを距離順に並べ、奥から手前へ塗れば、曲がった脇道も自然に映る。 */
+const LAT_RANGE=4;    // 左右に見るマス数
 
-  // 脇道がさらに先へ続く場合の下地（灯りが届かない奥）
-  dctx.fillStyle=shade([72,80,81], dist(xOut,(zN+zF)/2), 0.85);
-  dctx.fill();
-
-  if(isWall(cx+sdx*2, cy+sdy*2)) paintPlaneX(xOut, zN, zF, seed^0x4c);  // 脇道の突き当り
-  paintPlaneY(-FLOOR_H, xIn, xOut, zN, zF, FLOOR_BASE, seed^0x2a, 'floor');
-  paintPlaneY( CEIL_H,  xIn, xOut, zN, zF, CEIL_BASE,  seed^0x3b, 'ceil');
-  // 開口部の袖壁（斜め前後が壁なら、その面がこちらを向いている）
-  if(isWall(cx+sdx+fdx, cy+sdy+fdy)) paintPlaneZ(zF, xIn, xOut, seed^0x6e);
-  if(isWall(cx+sdx-fdx, cy+sdy-fdy)) paintPlaneZ(zN, xIn, xOut, seed^0x5d);
-  dctx.restore();
-
-  // 窓枠（手前側の柱）
-  dctx.strokeStyle=jointStyle(dist(xIn,zN),0.7); dctx.lineWidth=1.4;
-  dctx.beginPath();
-  dctx.moveTo(projX(xIn,zN), projY( CEIL_H,zN));
-  dctx.lineTo(projX(xIn,zN), projY(-FLOOR_H,zN));
-  dctx.stroke();
+// そのマスが画角に入っているか（ざっくり判定。外れたものは描かない）
+function cellInView(lat, k){
+  const zN=Math.max(ZMIN, k-0.5), zF=k+0.5;
+  const l=Math.min(projX(lat-0.5,zN), projX(lat-0.5,zF), projX(lat+0.5,zN), projX(lat+0.5,zF));
+  const r=Math.max(projX(lat-0.5,zN), projX(lat-0.5,zF), projX(lat+0.5,zN), projX(lat+0.5,zF));
+  return r>-8 && l<DW+8;
 }
 
 function drawDungeon(){
@@ -2046,30 +2025,37 @@ function drawDungeon(){
   dctx.fillStyle=g; dctx.fillRect(0,horizon,DW,DH-horizon);
 
   const fwd=DIRS[player.dir];
-  const left ={dx:DIRS[(player.dir+3)%4].dx, dy:DIRS[(player.dir+3)%4].dy};
-  const right={dx:DIRS[(player.dir+1)%4].dx, dy:DIRS[(player.dir+1)%4].dy};
+  const rgt=DIRS[(player.dir+1)%4];
+  // 盤面座標 → (前方k, 右lat) のマス
+  const cellOf=(lat,k)=>({x:player.x+fwd.dx*k+rgt.dx*lat, y:player.y+fwd.dy*k+rgt.dy*lat});
+  const wallAt=(lat,k)=>{ const c=cellOf(lat,k); return isWall(c.x,c.y); };
 
-  let blockedAt=MAXD;
-  for(let k=1;k<=MAXD;k++){
-    if(isWall(player.x+fwd.dx*k, player.y+fwd.dy*k)){ blockedAt=k; break; }
-  }
-
-  // 奥から手前へ塗る（画家のアルゴリズム）
-  for(let k=blockedAt;k>=0;k--){
-    const cx=player.x+fwd.dx*k, cy=player.y+fwd.dy*k;
-    const zN=Math.max(ZMIN, k-0.5), zF=k+0.5;
-    const seed=Math.round((cx*73856093)^(cy*19349663)^(k*83492791));
-    if(k>=1 && isWall(cx,cy)){
-      paintFrontWall(zN, seed);      // このマスは壁。手前側の面だけ見える
-      continue;
+  // 描く候補を集め、遠い順に並べる（画家のアルゴリズム）
+  const list=[];
+  for(let k=0;k<=MAXD;k++){
+    for(let lat=-LAT_RANGE;lat<=LAT_RANGE;lat++){
+      if(!cellInView(lat,k)) continue;
+      list.push({lat,k,d:lat*lat+k*k});
     }
-    paintCeilCell(zN, zF, seed);
-    paintFloorCell(zN, zF, seed);
-    if(isWall(cx+left.dx,  cy+left.dy))  paintSideCell(zN, zF, -1, seed^0x1234);
-    else paintOpening(zN, zF, -1, cx, cy, left.dx,  left.dy,  fwd.dx, fwd.dy, seed^0x1234);
-    if(isWall(cx+right.dx, cy+right.dy)) paintSideCell(zN, zF,  1, seed^0x5678);
-    else paintOpening(zN, zF,  1, cx, cy, right.dx, right.dy, fwd.dx, fwd.dy, seed^0x5678);
   }
+  list.sort((a,b)=>b.d-a.d);
+
+  list.forEach(({lat,k})=>{
+    const zN=Math.max(ZMIN, k-0.5), zF=k+0.5;
+    const x0=lat-0.5, x1=lat+0.5;
+    const c=cellOf(lat,k);
+    const seed=Math.round((c.x*73856093)^(c.y*19349663)^(k*83492791)^(lat*2654435761));
+    if(isWall(c.x,c.y)){
+      if(k===0) return;                       // 自分のマスが壁になることはない
+      // カメラを向いている面だけを描く
+      if(!wallAt(lat,k-1)) paintPlaneZ(zN, x0, x1, seed);              // 手前の面
+      if(lat>0 && !wallAt(lat-1,k)) paintPlaneX(x0, zN, zF, seed^0x11); // 左の面
+      if(lat<0 && !wallAt(lat+1,k)) paintPlaneX(x1, zN, zF, seed^0x22); // 右の面
+    }else{
+      paintPlaneY( CEIL_H,  x0, x1, zN, zF, CEIL_BASE,  seed^0x9e37, 'ceil');
+      paintPlaneY(-FLOOR_H, x0, x1, zN, zF, FLOOR_BASE, seed,        'floor');
+    }
+  });
 
   // 灯りの減衰：中央から離れるほど暗く落とす（松明を持って歩く感じ）
   let vg=dctx.createRadialGradient(DW/2,DH*0.52,DW*0.14, DW/2,DH*0.52,DW*0.72);
