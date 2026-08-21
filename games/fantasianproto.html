@@ -290,6 +290,7 @@
   body.desktop .battle-info .unitcard{min-width:0;}
 
   /* ---- 町：左に施設、右に風景と所持金 ---- */
+  body.desktop .town-utils{grid-column:1; grid-row:5; margin:0;}
   body.desktop #townView.on{
     display:grid;
     grid-template-columns: 1fr 1fr;
@@ -307,6 +308,7 @@
   /* ---- 一覧が主役の画面：中央に寄せて読みやすい幅に ---- */
   body.desktop #shopView.on > *,
   body.desktop #tavernView.on > *,
+  body.desktop #helpView.on > *,
   body.desktop #partyView.on > *{max-width:900px;margin-left:auto;margin-right:auto;}
   body.desktop .shop-list{max-height:calc(100vh - 396px);}
   body.desktop .tavern-list{max-height:calc(100vh - 330px);}
@@ -426,6 +428,27 @@
     border-radius:3px;padding:10px 12px;font-size:13px;
     min-height:44px;color:var(--ink-soft);line-height:1.7;
   }
+
+  /* ---------- 遊び方 ---------- */
+  .help-body{
+    background:rgba(232,226,212,.5);border:1px solid var(--paper-edge);border-radius:3px;
+    padding:14px 16px;font-size:13px;line-height:1.9;color:var(--ink-soft);
+    max-height:calc(100vh - 260px);overflow-y:auto;
+  }
+  .help-body h3{
+    font-size:14px;color:var(--wine);letter-spacing:3px;font-weight:700;
+    margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid rgba(120,108,80,.3);
+  }
+  .help-body h3:first-child{margin-top:0;}
+  .help-body p{margin:0 0 6px;}
+  .help-body b{color:#3c3424;}
+  .help-keys{width:100%;border-collapse:collapse;margin:4px 0 8px;font-size:12px;}
+  .help-keys td{padding:4px 8px;border-bottom:1px solid rgba(120,108,80,.18);vertical-align:top;}
+  .help-keys td:first-child{width:5.5em;color:#8a7d5e;white-space:nowrap;}
+  .hl-move{color:#4a6f9a;font-weight:700;}
+  .hl-atk{color:#9a4a4a;font-weight:700;}
+  .town-utils{display:flex;gap:8px;margin-top:8px;}
+  .town-utils button{flex:1;font-size:12px;padding:9px 0;letter-spacing:2px;}
 
   /* ---------- 戦闘 ---------- */
   .battle-head{
@@ -739,6 +762,8 @@
       <div class="title-buttons">
         <button class="key title-btn" id="bTitleNew">新しく始める</button>
         <button class="key title-btn" id="bTitleContinue">続きから</button>
+        <button class="key title-btn" id="bTitleHelp">遊び方</button>
+        <button class="key title-btn" id="bTitleSound">音：オン</button>
       </div>
       <div class="title-foot">RUISARD CODEX · prototype</div>
     </div>
@@ -837,6 +862,10 @@
       </button>
     </div>
     <div class="town-gold">所持金 <span id="townGold">0</span> G</div>
+    <div class="town-utils">
+      <button class="key" id="bTownHelp">遊び方</button>
+      <button class="key" id="bTownSound">音：オン</button>
+    </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="key" id="bTownToDungeon" style="max-width:240px;display:inline-block;width:100%;">迷宮へ降りる</button>
     </div>
@@ -874,6 +903,55 @@
       <button class="key" id="bTavernBack" style="max-width:240px;display:inline-block;width:100%;">町へ戻る</button>
     </div>
     <div class="log" id="tavernLog" style="margin-top:10px;">薄暗い酒場。火と杯と、いくつかの話し声。</div>
+  </div>
+
+  <!-- ============ 遊び方 ============ -->
+  <div id="helpView" class="view">
+    <div class="town-head">
+      <div class="town-title">遊び方</div>
+      <div class="town-sub">黄昏の聖域を歩くために</div>
+    </div>
+    <div class="help-body">
+      <h3>目的</h3>
+      <p>聖域の地下、六つの階層をくだり、最奥に眠る<b>黄昏の古竜</b>を討つ。<br>
+         各階の下り階段は<b>番人</b>が塞いでいる。倒さなければ先へは進めない。</p>
+
+      <h3>探索</h3>
+      <p>迷宮では前進・後退と左右の方向転換で歩く。歩いていると霧の生き物に出くわす。<br>
+         地図は歩いた場所だけが記される。<b>階段</b>で階層を移動し、B1 の上り階段から町へ戻れる。</p>
+      <table class="help-keys">
+        <tr><td>PC</td><td>↑↓←→ または W A S D</td></tr>
+        <tr><td>スマホ</td><td>画面下の方向ボタン</td></tr>
+      </table>
+
+      <h3>戦闘</h3>
+      <p>自分の駒を選ぶと、<span class="hl-move">青のマス</span>が移動先、<span class="hl-atk">赤の敵</span>が攻撃できる相手。<br>
+         全員が行動すると敵の番になる。1ターンに1体ずつ、移動と攻撃を選んでいく。</p>
+      <table class="help-keys">
+        <tr><td>魔法</td><td>撃つたびに<b>魔力</b>を消費する。宿屋で眠るか、魔力の雫で戻る</td></tr>
+        <tr><td>道具</td><td>選んだ駒の行動を使って、傷薬などを使う</td></tr>
+        <tr><td>逃げる</td><td>通常の戦いなら七割で成功。番人と古竜からは逃げられない</td></tr>
+        <tr><td>PC操作</td><td>矢印でカーソル移動／Enter で決定／Tab で味方切替／q・e・r＝待機・行動終了・魔法</td></tr>
+      </table>
+
+      <h3>町</h3>
+      <table class="help-keys">
+        <tr><td>宿屋</td><td>HP と魔力を回復する</td></tr>
+        <tr><td>教会</td><td>倒れた者を蘇らせる。<b>旅の記録（セーブ）</b>もここで行う</td></tr>
+        <tr><td>武器屋</td><td>武器・防具と、傷薬などの道具を売買する</td></tr>
+        <tr><td>酒場</td><td>Lv5 以上で同行者を雇える。連れて行けるのは一人まで</td></tr>
+      </table>
+
+      <h3>記録と全滅</h3>
+      <p>全滅すると、<b>最後に記録した時点</b>まで巻き戻る。階層を移動したときにも自動で記録されるが、
+         深くもぐる前には教会へ寄っておくとよい。</p>
+
+      <h3>覚醒</h3>
+      <p>Lv20 を越えた者は、教会で上位の職に<b>覚醒</b>できる。より強い魔法と力を得る。</p>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+      <button class="key" id="bHelpBack" style="max-width:240px;display:inline-block;width:100%;">戻る</button>
+    </div>
   </div>
 
   <!-- ============ 確認ダイアログ ============ -->
@@ -980,7 +1058,19 @@ document.addEventListener('touchstart', _primeAudio, true);
 document.addEventListener('mousedown', _primeAudio, true);
 document.addEventListener('keydown', _primeAudio, true);
 // 単音：周波数fから周波数f2へ、duration秒、波形type、音量vol、減衰expDecay
+/* 音のオン・オフ。ブラウザに覚えさせる（Webのゲームで音を切れないのは致命的） */
+const SOUND_KEY='twilight_sound';
+let soundOn=true;
+try{ soundOn = localStorage.getItem(SOUND_KEY)!=='off'; }catch(e){}
+function setSound(on){
+  soundOn=!!on;
+  try{ localStorage.setItem(SOUND_KEY, soundOn?'on':'off'); }catch(e){}
+  const label='音：'+(soundOn?'オン':'オフ');
+  ['bTitleSound','bTownSound'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent=label; });
+}
+
 function tone({f=440, f2=null, dur=0.18, type='sine', vol=0.18, attack=0.005, decay=null}={}){
+  if(!soundOn) return;
   const ctx=ac(); if(!ctx) return;
   const t=ctx.currentTime;
   const osc=ctx.createOscillator();
@@ -996,6 +1086,7 @@ function tone({f=440, f2=null, dur=0.18, type='sine', vol=0.18, attack=0.005, de
 }
 // ノイズ（短い）：揺れる風や打撃の質感に
 function noise({dur=0.12, vol=0.10, hpf=400, lpf=4000}={}){
+  if(!soundOn) return;
   const ctx=ac(); if(!ctx) return;
   const t=ctx.currentTime;
   const buf=ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
@@ -1051,10 +1142,10 @@ const SFX={
 /* ===== ダンジョン（3階層・固定設計） =====
    記号: # 壁 / . 通路 / > 下り階段 / < 上り階段 / * 魔法陣（ボス） */
 const FLOOR_SRC=[
-  // B1：広めで易しい。右下に下り階段。(2,1)はテスト用ワープ→B3魔法陣の隣
+  // B1：広めで易しい。左上に上り階段（町へ）、右下に下り階段。
   [
     "##############",
-    "#<~..#.......#",
+    "#<...#.......#",
     "#.##.#.#####.#",
     "#.#..#.#...#.#",
     "#.#.##.#.#.#.#",
@@ -1063,14 +1154,14 @@ const FLOOR_SRC=[
     "#...#.#....#.#",
     "#.###.#.##.#.#",
     "#.....#.#..#.#",
-    "#.###.#.##.#.#",
-    "#.#.......#>.#",
+    "#.###.#.##$#.#",
+    "#.#$.....$#>.#",
     "##############",
   ],
   // B2：入り組む。左上に上り階段、右下に下り階段。
   [
     "##############",
-    "#<...#....#..#",
+    "#<...#....#.$#",
     "##.#.#.##.#.##",
     "#..#...#..#..#",
     "#.####.#.###.#",
@@ -1080,17 +1171,17 @@ const FLOOR_SRC=[
     "#.#.######.#.#",
     "#.#......#.#.#",
     "#.######.#.#.#",
-    "#......#...>.#",
+    "#.....$#...>.#",
     "##############",
   ],
   // B3：迷路状、左上に上り、右下に下り。
   [
     "##############",
-    "#<..#.....#..#",
+    "#<..#.....#.$#",
     "#.#.#.###.#.##",
-    "#.#...#...#..#",
+    "#.#...#...#.$#",
     "#.#####.###.##",
-    "#.....#.#....#",
+    "#.....#.#$...#",
     "###.#.#.####.#",
     "#...#.#....#.#",
     "#.###.####.#.#",
@@ -1104,7 +1195,7 @@ const FLOOR_SRC=[
     "##############",
     "#<..........##",
     "#.####.####..#",
-    "#....#.#...#.#",
+    "#...$#.#...#.#",
     "###.##.#.#.#.#",
     "#...#..#.#...#",
     "#.###.##.#.###",
@@ -1112,7 +1203,7 @@ const FLOOR_SRC=[
     "###.#.#.####.#",
     "#...#.#.#....#",
     "#.###.#.#.####",
-    "#.....#.#..>.#",
+    "#.....#$#..>$#",
     "##############",
   ],
   // B5：複雑、強敵の領域
@@ -1120,15 +1211,15 @@ const FLOOR_SRC=[
     "##############",
     "#<.#.....#...#",
     "#..#.###.#.#.#",
-    "##.#.#.#.#.#.#",
+    "##.#.#$#.#.#.#",
     "#..#.#.#.#.#.#",
     "#.##.#.#...#.#",
     "#....#.#####.#",
     "###.##.......#",
-    "#...#.######.#",
+    "#...#$######.#",
     "#.#.#.#......#",
     "#.#.#.#.####.#",
-    "#.#.....#..>.#",
+    "#.#.....#$.>.#",
     "##############",
   ],
   // B6：最深部、最奥に魔法陣（古竜）
@@ -1144,7 +1235,7 @@ const FLOOR_SRC=[
     "######.#####.#",
     "#......#.....#",
     "#.######.###.#",
-    "#*.........#.#",
+    "#*........$#$#",
     "##############",
   ],
 ];
@@ -1152,6 +1243,7 @@ const FLOOR_SRC=[
 // 文字列フロアを {grid, stairsDown, stairsUp, altar, start} に変換
 function buildFloor(src){
   const grid=[]; let stairsDown=null, stairsUp=null, altar=null;
+  const chests=[];  // この床の宝箱の位置
   const warps=[];   // この床にあるワープ位置（{x,y}の配列）。飛び先はFLOOR_WARP_LINKSで指定
   src.forEach((row,y)=>{
     const line=[];
@@ -1163,20 +1255,20 @@ function buildFloor(src){
         else if(c==='<') stairsUp={x,y};
         else if(c==='*') altar={x,y};
         else if(c==='~') warps.push({x,y});
+        else if(c==='$'){ chests.push({x,y}); }
       }
     }
     grid.push(line);
   });
-  return {grid, stairsDown, stairsUp, altar, warps,
+  return {chests, opened:chests.map(()=>false), grid, stairsDown, stairsUp, altar, warps,
           visited: grid.map(row=>row.map(()=>false))};
 }
 const FLOORS=FLOOR_SRC.map(buildFloor);
 
 // ワープの飛び先テーブル：from "floorIndex:x,y" → {floor, x, y, label}
 // 各フロアの warps[] と座標が一致するエントリを設定する
-const WARP_LINKS={
-  '0:2,1': {floor:5, x:2, y:11, label:'最奥の祭壇前'},   // B1(2,1) → B6(2,11) ※魔法陣(1,11)の隣
-};
+// 階層間のワープ（現状は未使用。マップに '~' を置き、ここに飛び先を書けば有効になる）
+const WARP_LINKS={};
 
 let floorIndex=0;                 // 現在の階層（0=B1）
 let MAP=FLOORS[floorIndex].grid;  // 現在のマップ（既存コードがMAPを参照）
@@ -1228,6 +1320,14 @@ function drawMinimap(){
     }
   }
   // 現在地（向き付きの三角）
+  // 未開封の宝箱（踏んだ場所の周囲が見えていれば）
+  if(f.chests){
+    f.chests.forEach((c,i)=>{
+      if(f.opened[i] || !f.visited[c.y][c.x]) return;
+      mmctx.fillStyle='#d8ae4a';
+      mmctx.fillRect(ox+c.x*cell+cell*0.28, oy+c.y*cell+cell*0.28, cell*0.44, cell*0.44);
+    });
+  }
   const cx=ox+player.x*cell+cell/2, cy=oy+player.y*cell+cell/2;
   const fwd=DIRS[player.dir];
   mmctx.fillStyle='#ffcf4a';
@@ -1242,6 +1342,9 @@ function drawMinimap(){
 }
 
 // 階層を切り替える（dir:+1で下り, -1で上り）
+// 節目で自動的に記録する。教会だけが頼りだと、全滅の巻き戻しが大きすぎる
+function autoSave(){ try{ saveGame(); }catch(e){} }
+
 function changeFloor(delta){
   const ni=floorIndex+delta;
   if(ni<0 || ni>=FLOORS.length) return;
@@ -1252,6 +1355,8 @@ function changeFloor(delta){
   const f=FLOORS[floorIndex];
   const arrive = delta>0 ? f.stairsUp : f.stairsDown;
   if(arrive){ player.x=arrive.x; player.y=arrive.y; }
+  markVisited();
+  autoSave();          // 階層をまたいだ時点を自動で記録
 }
 
 /* ===== 装備データベース =====
@@ -1346,30 +1451,59 @@ function freshParty(){
   return [
     {name:'ガザール', cls:'賢者', sprite:'sage', level:1, exp:0,
      base:{hp:34, atk:9, def:4, mov:3, rng:1}, spellBase:{name:'業火', type:'damage', pow:14, radius:4},
-     equip:{weapon:'staff_oak', armor:'cloak_old'}, hp:34},
+     equip:{weapon:'staff_oak', armor:'cloak_old'}, hp:34, mp:14},
     {name:'戦士レン', cls:'戦士', sprite:'warrior', level:1, exp:0,
      base:{hp:46, atk:11, def:7, mov:3, rng:1},
-     equip:{weapon:'sword_rust', armor:'armor_leather'}, hp:46},
+     equip:{weapon:'sword_rust', armor:'armor_leather'}, hp:46, mp:0},
     {name:'僧侶ミラ', cls:'僧侶', sprite:'priest', level:1, exp:0,
      base:{hp:30, atk:7, def:5, mov:4, rng:1}, spellBase:{name:'癒し', type:'heal', pow:18, radius:3},
-     equip:{weapon:'rod_pilgrim', armor:'cloak_old'}, hp:30},
+     equip:{weapon:'rod_pilgrim', armor:'cloak_old'}, hp:30, mp:14},
   ];
 }
 let party = freshParty();
 
+/* ===== 魔力（MP） =====
+   魔法を撃ち放題だと戦闘に選択が生まれないので、消費資源を持たせる。
+   回復は宿屋・レベルアップ・道具（魔力の雫）のみ。 */
+const SPELL_COST={
+  '業火':6, '業火嵐':14, '黄昏の業火':30,
+  '癒し':6, '祝祷':14, '神の癒し':32,
+  '火遁の術':8,
+};
+// 職業ごとの初期MPと1レベルあたりの伸び
+const MP_TABLE={
+  '賢者'  :{base:16, per:2}, '大賢者':{base:26, per:3},
+  '僧侶'  :{base:16, per:2}, '聖女'  :{base:26, per:3},
+  '忍者'  :{base:12, per:2},
+  '戦士'  :{base:0,  per:0}, '剣聖':{base:0, per:0},
+  '狩人'  :{base:0,  per:0}, '盗賊':{base:0, per:0}, '侍':{base:0, per:0},
+};
+function mpMax(member){
+  const t=MP_TABLE[member.cls];
+  if(!t || !member.spellBase) return 0;
+  return t.base + t.per*(member.level-1);
+}
+// 現在MPを上限内に収める。レベルアップや装備変更のあとに呼ぶ
+function clampMp(member){
+  const max=mpMax(member);
+  if(member.mp===undefined || member.mp===null) member.mp=max;
+  member.mp=Math.max(0, Math.min(max, member.mp));
+  return member.mp;
+}
+
 /* ===== 成長 ===== */
 // 職業ごとの1レベルあたりの伸び（base加算 + 魔力spellPow）
 const GROWTH={
-  '戦士': {hp:7, atk:2, def:2, spellPow:0},
-  '賢者': {hp:4, atk:1, def:1, spellPow:3},
+  '戦士': {hp:7, atk:2, def:1, spellPow:0},
+  '賢者': {hp:4, atk:1, def:0, spellPow:3},
   '僧侶': {hp:5, atk:1, def:1, spellPow:3},
-  '剣聖': {hp:9, atk:3, def:3, spellPow:0},
+  '剣聖': {hp:9, atk:3, def:2, spellPow:0},
   '大賢者': {hp:6, atk:1, def:1, spellPow:5},
   '聖女': {hp:7, atk:1, def:1, spellPow:5},
   '狩人': {hp:5, atk:2, def:1, spellPow:0},
-  '盗賊': {hp:4, atk:3, def:1, spellPow:0},
+  '盗賊': {hp:4, atk:3, def:0, spellPow:0},
   '忍者': {hp:5, atk:3, def:1, spellPow:3},
-  '侍':   {hp:8, atk:3, def:3, spellPow:0},
+  '侍':   {hp:8, atk:3, def:2, spellPow:0},
 };
 // クラスチェンジの定義：現クラス→次クラス、料金（Lv×倍率）
 const CLASS_UP={
@@ -1440,11 +1574,12 @@ const ITEMS={
   herb:    {name:'傷薬',       price:40,  type:'heal',      pow:30, desc:'HP を 30 回復する'},
   elixir:  {name:'霊薬',       price:150, type:'heal',      pow:90, desc:'HP を 90 回復する'},
   dew:     {name:'聖泉の雫',   price:320, type:'heal_full',         desc:'HP を全回復する'},
+  ether:   {name:'魔力の雫',   price:180, type:'mp',        pow:30, desc:'魔力を 30 回復する'},
   feather: {name:'蘇生の羽',   price:500, type:'revive',            desc:'倒れた者を半分の HP で戻す'},
   smoke:   {name:'煙玉',       price:120, type:'escape',            desc:'戦闘から必ず逃げられる'},
 };
 // 店に並べる順（ITEMS のキー順に依存させない）
-const ITEM_SHOP_ORDER=['herb','elixir','dew','feather','smoke'];
+const ITEM_SHOP_ORDER=['herb','elixir','dew','ether','feather','smoke'];
 
 // 所持品キーから表示名を引く。装備・道具・キーアイテムのいずれでも解決できる。
 function itemName(key){
@@ -1480,6 +1615,7 @@ function gainExp(member, amount){
   while(member.exp >= expToNext(member.level)){
     member.exp -= expToNext(member.level);
     member.level++;
+    member.mp = mpMax(member);   // レベルアップで魔力も満ちる
     const g=GROWTH[member.cls];
     member.base.hp  += g.hp;
     member.base.atk += g.atk;
@@ -1586,10 +1722,12 @@ function effStats(member){
     if(e.slayMult && e.slayMult>slayMult) slayMult=e.slayMult;
   });
   s.slayMult=slayMult;
+  s.maxmp = mpMax(member);
   // 通常魔法
   if(member.spellBase){
     s.spell={name:member.spellBase.name, type:member.spellBase.type,
-             pow:member.spellBase.pow+spellPow, radius:member.spellBase.radius+spellRadius};
+             pow:member.spellBase.pow+spellPow, radius:member.spellBase.radius+spellRadius,
+             cost:SPELL_COST[member.spellBase.name] || 4};
   }
   // 使える魔法の配列（通常＋習得済みの上位魔法）
   s.spells=[];
@@ -1598,13 +1736,15 @@ function effStats(member){
   if(member.level>=4 && (member.cls==='賢者'||member.cls==='大賢者') && member.spellBase){
     s.spells.push({
       name:'業火嵐', type:'damage_all',
-      pow:Math.round((member.spellBase.pow+spellPow)*0.72)
+      pow:Math.round((member.spellBase.pow+spellPow)*0.72),
+      cost:SPELL_COST['業火嵐']
     });
   }
   if(member.level>=4 && (member.cls==='僧侶'||member.cls==='聖女') && member.spellBase){
     s.spells.push({
       name:'祝祷', type:'heal_all',
-      pow:Math.round((member.spellBase.pow+spellPow)*0.72)
+      pow:Math.round((member.spellBase.pow+spellPow)*0.72),
+      cost:SPELL_COST['祝祷']
     });
   }
   // === 上位職限定の最強魔法 ===
@@ -1613,12 +1753,14 @@ function effStats(member){
       name:'黄昏の業火', type:'damage',
       pow:Math.round((member.spellBase.pow+spellPow)*2.0),
       radius:6,
-      slayMult:1.5    // ドラゴンに1.5倍
+      slayMult:1.5,   // ドラゴンに1.5倍
+      cost:SPELL_COST['黄昏の業火']
     });
   }
   if(member.cls==='聖女' && member.level>=22 && member.spellBase){
     s.spells.push({
-      name:'神の癒し', type:'heal_full'     // 全味方を全快
+      name:'神の癒し', type:'heal_full',    // 全味方を全快
+      cost:SPELL_COST['神の癒し']
     });
   }
   // === 剣聖はクリティカル ===
@@ -1922,6 +2064,42 @@ function drawDungeon(){
   dctx.restore();
 }
 
+/* ===== 宝箱 =====
+   階段しか無い床だと探索する理由がないので、行き止まりに宝を置いてある。
+   中身は階層に応じて増える。 */
+function openChest(){
+  const m=floorScale(floorIndex);
+  SFX.loot();
+  const roll=Math.random();
+  if(roll<0.40){                                   // 金貨
+    const g=Math.round((25+Math.floor(Math.random()*35))*m);
+    addGold(g);
+    elExploreLog.textContent=`古びた櫃だ。金貨が ${g} 枚、埃をかぶって眠っていた。`;
+  }else if(roll<0.80){                             // 道具
+    const pool=['herb','herb','elixir','ether','feather','smoke'];
+    const k=pool[Math.floor(Math.random()*pool.length)];
+    const n=1+(Math.random()<0.35?1:0);
+    for(let i=0;i<n;i++) addItem(k);
+    elExploreLog.textContent=`櫃の中に ${itemName(k)}${n>1?' ×'+n:''} が納められていた。`;
+  }else{                                           // 装備
+    const rar = m>=3.5 ? (Math.random()<0.35?'epic':'rare')
+              : m>=2.0 ? (Math.random()<0.35?'rare':'uncommon')
+              : (Math.random()<0.4?'uncommon':'common');
+    const pool=droppableKeys(rar);
+    if(pool.length){
+      const k=pool[Math.floor(Math.random()*pool.length)];
+      addItem(k);
+      elExploreLog.textContent=`櫃の底から ${itemName(k)} が出てきた。`;
+    }else{
+      const g=Math.round(40*m); addGold(g);
+      elExploreLog.textContent=`櫃は空だった。隅に金貨が ${g} 枚。`;
+    }
+  }
+  refreshHud();
+  drawDungeon();
+  drawMinimap();
+}
+
 /* ---------- 探索 操作 ---------- */
 function refreshHud(){
   elPos.textContent=`地下${floorIndex+1}階`;
@@ -1971,6 +2149,13 @@ function move(forward){
   const f=FLOORS[floorIndex];
   // ワープゾーン
   if(f.warps && f.warps.some(w=>w.x===player.x && w.y===player.y)){
+    // 宝箱：踏んだら開ける。一度開けたら空になる
+    const ci=f.chests ? f.chests.findIndex(c=>c.x===player.x && c.y===player.y) : -1;
+    if(ci>=0 && !f.opened[ci]){
+      f.opened[ci]=true;
+      openChest();
+      return;
+    }
     const linkKey=`${floorIndex}:${player.x},${player.y}`;
     const link=WARP_LINKS[linkKey];
     if(link){
@@ -2477,6 +2662,28 @@ const FLOOR_ENEMIES=[
   ['ガーゴイル','メデューサ','ハーピー','メデューサ','ミノタウルス'],// B5：深層の主級が出る
   ['ミノタウルス','吸血鬼','メデューサ','ガーゴイル','吸血鬼'],      // B6：古竜の領域
 ];
+/* 階層ごとの敵の強さ倍率。
+   素の敵データは B1 を基準にしてあるので、深い階ではここで引き上げる。
+   これが無いと、味方の成長に敵が置いていかれて全戦闘が作業になる。 */
+const FLOOR_SCALE=[1.00, 1.55, 2.20, 3.00, 3.90, 4.90];
+function floorScale(fi){ return FLOOR_SCALE[Math.min(fi, FLOOR_SCALE.length-1)] || 1; }
+// 雑魚敵に階層倍率をかける（ボス・中ボスは固有値を持つので対象外）
+function applyFloorScale(enemy, fi){
+  const m=floorScale(fi);
+  if(m<=1.001) return enemy;
+  enemy.hp   =Math.round(enemy.hp*m);
+  enemy.maxhp=Math.round(enemy.maxhp*m);
+  enemy.atk  =Math.round(enemy.atk*m);
+  enemy.def  =Math.round(enemy.def*Math.sqrt(m));   // 防御は控えめに（硬すぎると長引く）
+  if(enemy.spell) enemy.spell={...enemy.spell, pow:Math.round(enemy.spell.pow*m)};
+  // 見返りも同じだけ伸ばす。強さだけ上げると深層が延々とした作業になる
+  enemy.exp = Math.round(enemyExp(enemy)*m);
+  if(enemy.goldRange) enemy.goldRange=[Math.round(enemy.goldRange[0]*m), Math.round(enemy.goldRange[1]*m)];
+  else enemy.goldRange=[Math.round((({1:3,2:8,3:20})[enemy.rank||1])*m),
+                        Math.round((({1:8,2:18,3:40})[enemy.rank||1])*m)];
+  return enemy;
+}
+
 function pickEnemyForFloor(){
   const names=FLOOR_ENEMIES[floorIndex]||FLOOR_ENEMIES[0];
   const nm=names[Math.floor(Math.random()*names.length)];
@@ -2590,6 +2797,7 @@ function startBattle(isBoss, midbossKey){
     units.push({
       name:u.name, cls:u.cls, sprite:sp, side:'ally',
       maxhp:s.maxhp, hp:Math.min(u.hp,s.maxhp),
+      maxmp:s.maxmp, mp:Math.min(clampMp(u), s.maxmp),
       atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, critRate:s.critRate,
       ref:u,
       x:startCols[i%3], y:BH_-2, acted:false, col:'#2ef0d0', alive:true
@@ -2606,6 +2814,7 @@ function startBattle(isBoss, midbossKey){
       units.push({
         name:c.name, cls:c.cls, sprite:c.sprite, side:'ally',
         maxhp:s.maxhp, hp:Math.min(c.hp,s.maxhp),
+        maxmp:s.maxmp, mp:Math.min(clampMp(c), s.maxmp),
         atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, critRate:compCrit,
         beastSlay:h.beastSlay,        // 動物特効（狩人）
         counterRate:h.counterRate,    // 反撃（侍）
@@ -2620,16 +2829,24 @@ function startBattle(isBoss, midbossKey){
     let bossUnit=DRAGON;
     if(loop>=3) bossUnit=GOLDEN_DRAGON;
     else if(loop>=2) bossUnit=BLACK_DRAGON;
-    units.push(applyLoopMult({...bossUnit, side:'foe', x:Math.floor(BG/2), y:1, acted:false, alive:true}));
+    const bs=floorScale(5)*1.25;
+    const scaled={...bossUnit,
+      hp:Math.round(bossUnit.hp*bs), maxhp:Math.round(bossUnit.maxhp*bs),
+      atk:Math.round(bossUnit.atk*bs), def:Math.round(bossUnit.def*Math.sqrt(bs)),
+      // 吐息は範囲攻撃なので伸びを抑える（そのまま倍率をかけると全滅が確定する）
+      spell:bossUnit.spell?{...bossUnit.spell, pow:Math.round(bossUnit.spell.pow*bs*0.55)}:null,
+      exp:Math.round((bossUnit.exp||120)*bs),
+      goldRange:bossUnit.goldRange?[Math.round(bossUnit.goldRange[0]*bs),Math.round(bossUnit.goldRange[1]*bs)]:null};
+    units.push(applyLoopMult({...scaled, side:'foe', x:Math.floor(BG/2), y:1, acted:false, alive:true}));
   }else if(midbossKey){
     // 中ボス1体＋手下の雑魚2体
     const mb=MIDBOSSES[midbossKey];
-    units.push(applyLoopMult({...mb, side:'foe', x:Math.floor(BG/2), y:1, acted:false, alive:true}));
+    units.push(applyLoopMult(applyFloorScale({...mb, side:'foe', x:Math.floor(BG/2), y:1, acted:false, alive:true}, floorIndex)));
     // 階層プールから手下を2体
     const cols=[1,6];
     for(let i=0;i<2;i++){
       const t=pickEnemyForFloor();
-      units.push(applyLoopMult({...t, side:'foe', x:cols[i], y:2, acted:false, alive:true}));
+      units.push(applyLoopMult(applyFloorScale({...t, side:'foe', x:cols[i], y:2, acted:false, alive:true}, floorIndex)));
     }
   }else{
     // 通常戦：雑魚1〜4体（階層別プールから）
@@ -2638,7 +2855,7 @@ function startBattle(isBoss, midbossKey){
     const cols=[1,3,5,6];
     for(let i=0;i<cnt;i++){
       const t=pickEnemyForFloor();
-      units.push(applyLoopMult({...t, side:'foe', x:cols[i], y:1+(i%2), acted:false, alive:true}));
+      units.push(applyLoopMult(applyFloorScale({...t, side:'foe', x:cols[i], y:1+(i%2), acted:false, alive:true}, floorIndex)));
     }
   }
   phase='player';
@@ -2862,9 +3079,11 @@ function selectUnit(u){
   // 魔法を持つキャラなら魔法ボタンを表示
   const spells=u.spells||[];
   if(spells.length>0){
+    const any=spells.some(sp=>canAfford(u,sp));
     elSpell.style.display='';
-    elSpell.disabled=false;
-    elSpell.textContent= spells.length>1 ? '魔法を選ぶ' : ('魔法：'+spells[0].name);
+    elSpell.disabled=!any;
+    elSpell.textContent = !any ? `魔力切れ（${u.mp}/${u.maxmp}）`
+      : (spells.length>1 ? `魔法を選ぶ（${u.mp}/${u.maxmp}）` : `魔法：${spells[0].name}（${spellCost(spells[0])}）`);
   }else{
     elSpell.style.display='none';
   }
@@ -2934,6 +3153,14 @@ function enterSpellAim(){
 // 魔法発動（種別で効果を分岐）
 function castSpell(target){
   const caster=selected, sp=currentSpell();
+  if(!canAfford(caster, sp)){
+    elHint.textContent=`${caster?caster.name:''} の魔力が足りない。`;
+    spellAiming=false; spellTargets=[]; spellAreaCells=[];
+    drawBattle();
+    return;
+  }
+  caster.mp -= spellCost(sp);
+  if(caster.ref) caster.ref.mp = caster.mp;   // 戦闘後も減ったまま持ち帰る
   if(!sp) return;
   // === 全体攻撃：全敵に順次火の玉 ===
   if(sp.type==='damage_all'){
@@ -3636,6 +3863,10 @@ elSpell.onclick=()=>{
   }
 };
 function activateSpell(sp){
+  if(!canAfford(selected, sp)){
+    elHint.textContent=`${selected.name} の魔力が足りない。`;
+    return;
+  }
   // 全体魔法は照準不要、即発動。それ以外は通常の照準モードへ
   if(sp.type==='damage_all' || sp.type==='heal_all' || sp.type==='heal_full'){
     castSpell(null);
@@ -3676,6 +3907,12 @@ function applyItemToHp(it, cur, max){
 function useItemOnMember(key, m){      // 探索中の対象（party / 同行者）
   const it=ITEMS[key]; if(!it) return null;
   const max=effStats(m).maxhp;
+  if(it.type==='mp'){
+    const mmax=mpMax(m); if(!mmax || m.hp<=0) return null;
+    clampMp(m); if(m.mp>=mmax) return null;
+    const before=m.mp; m.mp=Math.min(mmax, m.mp+it.pow);
+    return `${m.name} の魔力が ${m.mp-before} 回復した。`;
+  }
   if(it.type==='heal'||it.type==='heal_full'){
     if(m.hp<=0 || m.hp>=max) return null;
     const before=m.hp;
@@ -3691,6 +3928,13 @@ function useItemOnMember(key, m){      // 探索中の対象（party / 同行者
 }
 function useItemOnUnit(key, u){        // 戦闘中の対象（ally ユニット）
   const it=ITEMS[key]; if(!it) return null;
+  if(it.type==='mp'){
+    if(!u.alive || !u.maxmp || u.mp>=u.maxmp) return null;
+    const before=u.mp; u.mp=Math.min(u.maxmp, u.mp+it.pow);
+    if(u.ref) u.ref.mp=u.mp;
+    spawnHitFx(u, u.mp-before, 'heal');
+    return `${u.name} の魔力が ${u.mp-before} 回復した。`;
+  }
   if(it.type==='heal'||it.type==='heal_full'){
     if(!u.alive || u.hp>=u.maxhp) return null;
     const before=u.hp;
@@ -3710,9 +3954,10 @@ function useItemOnUnit(key, u){        // 戦闘中の対象（ally ユニット
   return null;
 }
 // その道具をその対象に使えるか（使えない相手をボタンに出さないため）
-function canUseItemOn(key, cur, max, alive){
+function canUseItemOn(key, cur, max, alive, mp, mpMaxV){
   const it=ITEMS[key]; if(!it) return false;
   if(it.type==='revive') return !alive || cur<=0;
+  if(it.type==='mp')     return alive && cur>0 && mpMaxV>0 && mp<mpMaxV;
   if(it.type==='heal'||it.type==='heal_full') return (alive && cur>0) && cur<max;
   return false;
 }
@@ -3752,16 +3997,18 @@ function pickItemTarget(key, where){
   const targets=[];
   if(where==='battle'){
     units.filter(u=>u.side==='ally').forEach(u=>{
-      if(canUseItemOn(key, u.hp, u.maxhp, u.alive))
-        targets.push({label:`${u.name}　HP ${Math.max(0,u.hp)}/${u.maxhp}`, apply:()=>useItemOnUnit(key,u)});
+      if(canUseItemOn(key, u.hp, u.maxhp, u.alive, u.mp, u.maxmp))
+        targets.push({label:`${u.name}　HP ${Math.max(0,u.hp)}/${u.maxhp}`+(u.maxmp?`　MP ${Math.max(0,u.mp)}/${u.maxmp}`:''),
+                      apply:()=>useItemOnUnit(key,u)});
     });
   }else{
     const members=[...party];
     if(activeCompanion && hiredCompanions[activeCompanion]) members.push(hiredCompanions[activeCompanion]);
     members.forEach(m=>{
-      const max=effStats(m).maxhp;
-      if(canUseItemOn(key, m.hp, max, m.hp>0))
-        targets.push({label:`${m.name}　HP ${Math.max(0,m.hp)}/${max}`, apply:()=>useItemOnMember(key,m)});
+      const max=effStats(m).maxhp, mmax=mpMax(m);
+      if(canUseItemOn(key, m.hp, max, m.hp>0, clampMp(m), mmax))
+        targets.push({label:`${m.name}　HP ${Math.max(0,m.hp)}/${max}`+(mmax?`　MP ${m.mp}/${mmax}`:''),
+                      apply:()=>useItemOnMember(key,m)});
     });
   }
   elSpellChoiceList.innerHTML='';
@@ -3769,7 +4016,9 @@ function pickItemTarget(key, where){
   if(targets.length===0){
     const none=document.createElement('div');
     none.style.cssText='font-size:12px;color:#8a7d5e;letter-spacing:1px;padding:6px 2px;';
-    none.textContent = it.type==='revive' ? '倒れている者はいない。' : '傷ついている者はいない。';
+    none.textContent = it.type==='revive' ? '倒れている者はいない。'
+                     : it.type==='mp'     ? '魔力の減っている者はいない。'
+                     : '傷ついている者はいない。';
     elSpellChoiceList.appendChild(none);
   }
   targets.forEach(t=>{
@@ -3830,9 +4079,12 @@ function doFlee(guaranteed){
   }
 }
 
+function spellCost(sp){ return (sp && sp.cost) || 0; }
+function canAfford(caster, sp){ return (caster?caster.mp:0) >= spellCost(sp); }
+
 function openSpellChoice(spells){
   elSpellChoiceList.innerHTML='';
-  setChoiceTitle();
+  setChoiceTitle(selected ? `使用する魔法を選ぶ（魔力 ${selected.mp}/${selected.maxmp}）` : null);
   spells.forEach((sp,i)=>{
     const b=document.createElement('button');
     b.className='key';
@@ -3842,6 +4094,9 @@ function openSpellChoice(spells){
     else if(sp.type==='damage_all') desc=`全体攻撃・1発${sp.pow}`;
     else if(sp.type==='heal_all') desc=`全体回復・1人${sp.pow}`;
     else if(sp.type==='heal_full') desc=`全員を完全回復`;
+    desc += `　／　魔力 ${spellCost(sp)}`;
+    const poor=!canAfford(selected, sp);
+    if(poor){ b.disabled=true; b.style.opacity='0.45'; desc+='（足りない）'; }
     b.innerHTML=`<div style="font-weight:700">${sp.name}</div><div style="font-size:11px;color:#8a7d5e;letter-spacing:1px;margin-top:2px">${desc}</div>`;
     b.style.padding='10px';
     b.onclick=()=>{
@@ -4149,8 +4404,9 @@ function renderInfo(){
     const d=document.createElement('div');
     d.className='unitcard'+(u.side==='foe'?' foe':'');
     const pct=Math.max(0,u.hp)/u.maxhp*100;
+    const mp = (u.side==='ally' && u.maxmp) ? `　MP ${Math.max(0,u.mp)}/${u.maxmp}` : '';
     d.innerHTML=`<div class="nm">${u.name}${u.alive?'':' ✕'}</div>
-      <div class="sub">${u.alive?('HP '+Math.max(0,u.hp)+'/'+u.maxhp):'戦闘不能'}</div>
+      <div class="sub">${u.alive?('HP '+Math.max(0,u.hp)+'/'+u.maxhp+mp):'戦闘不能'}</div>
       <div class="hpbar"><i style="width:${pct}%"></i></div>`;
     (u.side==='foe'?elFoes:elInfo).appendChild(d);
   });
@@ -4195,7 +4451,9 @@ function renderParty(){
     const div=document.createElement('div');
     div.className='member';
     // ステータス行
-    let statLine=`<span>HP <b>${s.maxhp}</b></span><span>攻撃 <b>${s.atk}</b></span><span>防御 <b>${s.def}</b></span><span>移動 <b>${s.mov}</b></span>`;
+    let statLine=`<span>HP <b>${s.maxhp}</b></span>`;
+    if(s.maxmp) statLine+=`<span>MP <b>${clampMp(m)}/${s.maxmp}</b></span>`;
+    statLine+=`<span>攻撃 <b>${s.atk}</b></span><span>防御 <b>${s.def}</b></span><span>移動 <b>${s.mov}</b></span>`;
     if(s.spell){
       statLine+=`<span>${s.spell.type==='heal'?'回復':'魔力'} <b>${s.spell.pow}</b></span><span>射程 <b>${s.spell.radius}</b></span>`;
     }
@@ -4281,6 +4539,7 @@ const elShopLog=document.getElementById('shopLog');
 const elShopList=document.getElementById('shopList');
 
 function openTown(){
+  autoSave();          // 町に着いた時点を自動で記録
   hideView(elExploreView);
   hideView(elBattleView);
   hideView(elPartyView);
@@ -4339,7 +4598,7 @@ function visitInn(){
     SFX.heal();
     allMembers.forEach(m=>{
       const max=effStats(m).maxhp;
-      if(m.hp>0) m.hp=max;   // 戦闘不能者は教会へ
+      if(m.hp>0){ m.hp=max; m.mp=mpMax(m); }   // 戦闘不能者は教会へ
     });
     elTownLog.textContent='よく眠れた。傷は癒え、明日への力が満ちる。';
     refreshTownGold();
@@ -4361,7 +4620,7 @@ function visitChurch(){
         return;
       }
       SFX.heal();
-      downed.forEach(m=>{ m.hp=Math.floor(effStats(m).maxhp*0.5); });
+      downed.forEach(m=>{ m.hp=Math.floor(effStats(m).maxhp*0.5); m.mp=Math.floor(mpMax(m)*0.5); });
       elTownLog.textContent=`${names} に息吹が戻った。`;
       refreshTownGold();
     });
@@ -4734,7 +4993,7 @@ function saveGame(){
       party: party.map(m=>({
         name:m.name, cls:m.cls, sprite:m.sprite, level:m.level, exp:m.exp,
         base:{...m.base}, spellBase: m.spellBase ? {...m.spellBase} : null,
-        equip:{...m.equip}, hp:m.hp
+        equip:{...m.equip}, hp:m.hp, mp:m.mp
       })),
       inventory:{...inventory},
       gold,
@@ -4744,12 +5003,13 @@ function saveGame(){
       loop,
       hiredCompanions: Object.keys(hiredCompanions).reduce((acc,k)=>{
         const c=hiredCompanions[k];
-        acc[k]={cls:c.cls, name:c.name, sprite:c.sprite, level:c.level, exp:c.exp, hp:c.hp, base:{...c.base}, equip:{...c.equip}, beastSlay:c.beastSlay};
+        acc[k]={cls:c.cls, name:c.name, sprite:c.sprite, level:c.level, exp:c.exp, hp:c.hp, mp:c.mp, base:{...c.base}, equip:{...c.equip}, beastSlay:c.beastSlay};
         return acc;
       }, {}),
       activeCompanion,
       midbosses: FLOOR_MIDBOSS.map(mb=>mb?{key:mb.key, defeated:mb.defeated}:null),
       visited: FLOORS.map(f=>f.visited.map(row=>row.slice())),
+      chests: FLOORS.map(f=>(f.opened||[]).slice()),
       ts: Date.now()
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -4767,7 +5027,7 @@ function loadGame(){
     party = d.party.map(m=>({
       name:m.name, cls:m.cls, sprite:m.sprite, level:m.level, exp:m.exp,
       base:{...m.base}, spellBase: m.spellBase ? {...m.spellBase} : null,
-      equip:{...m.equip}, hp:m.hp
+      equip:{...m.equip}, hp:m.hp, mp:m.mp
     }));
     inventory={...d.inventory};
     gold=d.gold||0;
@@ -4784,6 +5044,9 @@ function loadGame(){
     if(d.visited){
       d.visited.forEach((grid,i)=>{ if(FLOORS[i]) FLOORS[i].visited=grid.map(row=>row.slice()); });
     }
+    if(d.chests){
+      d.chests.forEach((arr,i)=>{ if(FLOORS[i]&&Array.isArray(arr)) FLOORS[i].opened=arr.slice(); });
+    }
     return true;
   }catch(e){ console.error(e); return false; }
 }
@@ -4799,6 +5062,27 @@ function saveTimestamp(){
   }catch(e){ return null; }
 }
 
+/* ---------- 遊び方 ---------- */
+const elHelpView=document.getElementById('helpView');
+let helpReturn=null;   // 戻り先のビュー
+function openHelp(from){
+  helpReturn=from;
+  hideView(from);
+  showView(elHelpView);
+  elHelpView.scrollTop=0;
+  const hb=elHelpView.querySelector('.help-body'); if(hb) hb.scrollTop=0;
+}
+function closeHelp(){
+  hideView(elHelpView);
+  showView(helpReturn||elTitleView);
+  helpReturn=null;
+}
+document.getElementById('bHelpBack').onclick=closeHelp;
+document.getElementById('bTitleHelp').onclick=()=>openHelp(elTitleView);
+document.getElementById('bTownHelp').onclick=()=>openHelp(elTownView);
+document.getElementById('bTitleSound').onclick=()=>setSound(!soundOn);
+document.getElementById('bTownSound').onclick=()=>setSound(!soundOn);
+
 /* ---------- タイトル ---------- */
 const elTitleView=document.getElementById('titleView');
 const elMainTitlebar=document.getElementById('mainTitlebar');
@@ -4813,7 +5097,7 @@ function startNewGame(){
   loop=1;
   hiredCompanions={};
   activeCompanion=null;
-  FLOORS.forEach(f=>{ f.visited=f.grid.map(row=>row.map(()=>false)); });
+  FLOORS.forEach(f=>{ f.visited=f.grid.map(row=>row.map(()=>false)); f.opened=(f.chests||[]).map(()=>false); });
   FLOOR_MIDBOSS.forEach(mb=>{ if(mb) mb.defeated=false; });
   // プロローグを表示
   showPrologue();
@@ -4870,6 +5154,7 @@ if(!hasSave()){
   continueBtn.disabled=true;
   continueBtn.textContent='続きから（記録なし）';
 }
+setSound(soundOn);
 loadSpriteImages();
 
 // 画面の縦横比に応じてレイアウトを切り替え（JSで判定するのでiOS制限の影響を受けない）
