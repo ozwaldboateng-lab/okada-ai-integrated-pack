@@ -765,7 +765,7 @@
         <button class="key title-btn" id="bTitleHelp">遊び方</button>
         <button class="key title-btn" id="bTitleSound">音：オン</button>
       </div>
-      <div class="title-foot">RUISARD CODEX · prototype</div>
+      <div class="title-foot">RUISARD CODEX · ver 1.0</div>
     </div>
   </div>
 
@@ -805,6 +805,7 @@
         <div><span class="k">方位</span> <span class="compass" id="dir">北</span></div>
         <div><span class="k">歩数</span> <span class="v" id="steps">0</span></div>
         <div><span class="k">隊列HP</span> <span class="v" id="partyHp">--</span></div>
+        <div><span class="k">魔力</span> <span class="v" id="partyMp">--</span></div>
         <div><span class="k">所持金</span> <span class="v" id="gold" style="color:#b08d3e;">0 G</span></div>
       </div>
       <div class="minimap-box">
@@ -999,7 +1000,7 @@
     <div class="battle-info" id="battleInfo"></div>
   </div>
 
-  <div class="foot">RUISARD CODEX · ↑↓←→ / WASD でも操作可 · prototype</div>
+  <div class="foot">RUISARD CODEX · ↑↓←→ / WASD でも操作可 · ver 1.0</div>
 </div>
 
 <script>
@@ -1772,6 +1773,7 @@ const elPos=document.getElementById('floor');
 const elDir=document.getElementById('dir');
 const elSteps=document.getElementById('steps');
 const elPartyHp=document.getElementById('partyHp');
+const elPartyMp=document.getElementById('partyMp');
 const elExploreLog=document.getElementById('exploreLog');
 
 /* ---------- 擬似3D ダンジョン描画 ---------- */
@@ -2108,6 +2110,18 @@ function refreshHud(){
   const total=party.reduce((s,u)=>s+Math.max(0,u.hp),0);
   const max=party.reduce((s,u)=>s+effStats(u).maxhp,0);
   elPartyHp.textContent=`${total}/${max}`;
+  // 魔力は残量が行動を左右するので、探索中も見えるようにしておく
+  if(elPartyMp){
+    const casters=party.filter(u=>mpMax(u)>0);
+    if(casters.length){
+      const mp=casters.reduce((s,u)=>s+clampMp(u),0);
+      const mpMaxTotal=casters.reduce((s,u)=>s+mpMax(u),0);
+      elPartyMp.textContent=`${mp}/${mpMaxTotal}`;
+      elPartyMp.style.color = mp <= mpMaxTotal*0.25 ? '#8a4a4a' : '';
+    }else{
+      elPartyMp.textContent='—';
+    }
+  }
   const elGold=document.getElementById('gold');
   if(elGold) elGold.textContent=`${gold} G`;
   markVisited();
@@ -4381,7 +4395,7 @@ document.getElementById('overlayBtn').onclick=()=>{
     elExploreLog.textContent='古竜は斃れた。聖域に、もう霧の気配はない。（クリア後も探索を続けられます）';
   }else if(wasLose){
     elExploreLog.textContent = restoredFromSave
-      ? '気がつくと、最後に旅を記録した祭壇のそばに立っていた。刻まれた記録が、一行を引き戻した。'
+      ? '気がつくと、最後に記録された場所に立っていた。刻まれた旅が、一行を引き戻したらしい。'
       : '気がつくと入口に戻されていた……。';
   }else{
     elExploreLog.textContent='戦いを終え、再び迷宮を進む。';
