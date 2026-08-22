@@ -444,6 +444,25 @@
     min-height:44px;color:var(--ink-soft);line-height:1.7;
   }
 
+  /* ---------- 読み込み中 ---------- */
+  #bootVeil{
+    position:absolute;inset:0;z-index:80;
+    background:radial-gradient(125% 90% at 50% 0%, #efe9db 0%, #e3dccb 58%, #d6cdba 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
+  }
+  #bootVeil.done{display:none;}
+  .boot-en{font-family:'Cormorant Garamond',serif;font-style:italic;
+    letter-spacing:min(6px,1.4vw);color:#8a7d5e;font-size:clamp(10px,2.6vw,13px);margin-bottom:6px;}
+  .boot-jp{font-family:'Shippori Mincho',serif;font-weight:700;
+    font-size:clamp(22px,7vw,38px);letter-spacing:min(12px,2.4vw);
+    color:#2f2a20;white-space:nowrap;}
+  .boot-en{white-space:nowrap;}
+  .boot-rule{width:150px;height:1px;background:linear-gradient(90deg,transparent,#b08d3e,transparent);margin:14px auto 18px;}
+  .boot-msg{font-size:12px;color:#8a7d5e;letter-spacing:3px;}
+  .boot-dots::after{content:'…';animation:bootDots 1.2s steps(4,end) infinite;}
+  @keyframes bootDots{0%{content:'';}25%{content:'・';}50%{content:'・・';}75%{content:'・・・';}}
+
   /* ---------- 遊び方 ---------- */
   .help-body{
     background:rgba(232,226,212,.5);border:1px solid var(--paper-edge);border-radius:3px;
@@ -779,6 +798,13 @@
 </head>
 <body>
 <div id="machine">
+  <!-- スクリプト（画像データを含む）を読み終えるまでの覆い。最後に外す -->
+  <div id="bootVeil">
+    <div class="boot-en">The Twilight Sanctuary</div>
+    <div class="boot-jp">黄　昏　の　聖　域</div>
+    <div class="boot-rule"></div>
+    <div class="boot-msg">読み込み中<span class="boot-dots"></span></div>
+  </div>
   <!-- ============ タイトル ============ -->
   <div id="titleView" class="view on">
     <div class="title-veil"></div>
@@ -1372,7 +1398,7 @@ function drawMinimap(){
 
 // 階層を切り替える（dir:+1で下り, -1で上り）
 // 節目で自動的に記録する。教会だけが頼りだと、全滅の巻き戻しが大きすぎる
-function autoSave(){ try{ saveGame(); }catch(e){} }
+function autoSave(){ try{ saveGame('auto'); }catch(e){} }
 
 function changeFloor(delta){
   const ni=floorIndex+delta;
@@ -1384,6 +1410,7 @@ function changeFloor(delta){
   const f=FLOORS[floorIndex];
   const arrive = delta>0 ? f.stairsUp : f.stairsDown;
   if(arrive){ player.x=arrive.x; player.y=arrive.y; }
+  applyFloorPalette();
   markVisited();
   autoSave();          // 階層をまたいだ時点を自動で記録
 }
@@ -1834,7 +1861,7 @@ function isWall(x,y){ return cellAt(x,y)===1; }
 /* ===== 陰影 =====
    奥ほど暗く、かつ霧に溶ける。以前は奥ほど明るい霧色へ寄せていたため、
    突き当りの壁が光って見えて奥行きが反転していた。 */
-const FOG_DEEP=[92,102,104];              // 奥は少し青みの冷たい霧
+let FOG_DEEP=[92,102,104];              // 奥は少し青みの冷たい霧
 const WARM=[0.12,0.02,-0.12];             // 灯りの色（手前ほど暖色に寄る）
 function shade(base, z, mul){
   const lit  = 1/(1 + 0.16*z*z);          // 視点の灯り：距離の二乗で減衰
@@ -1849,10 +1876,26 @@ function jointStyle(z, a){
   return `rgba(38,44,41,${(a*t).toFixed(3)})`;
 }
 
-const WALL_BASE  = [168,175,163];   // 突き当りの壁（正面から光が当たる）
-const SIDE_BASE  = [133,141,131];   // 側壁（斜めなので少し暗い）
-const FLOOR_BASE = [126,134,123];
-const CEIL_BASE  = [ 78, 85, 83];
+/* 階層ごとの色調。数値だけ上げても景色が同じだと深くなった実感が出ないので、
+   浅い層は苔むした石、深層は冷たい黒石へと寄せていく。 */
+const FLOOR_PALETTE=[
+  {wall:[172,177,158], side:[137,144,127], floor:[130,137,119], ceil:[ 81, 88, 80], fog:[ 96,106, 98]}, // B1 苔むした石灰
+  {wall:[168,175,163], side:[133,141,131], floor:[126,134,123], ceil:[ 78, 85, 83], fog:[ 92,102,104]}, // B2 標準
+  {wall:[163,169,166], side:[129,136,134], floor:[122,129,126], ceil:[ 75, 81, 83], fog:[ 88, 98,106]}, // B3 湿った灰
+  {wall:[157,161,169], side:[124,129,137], floor:[117,122,130], ceil:[ 71, 76, 86], fog:[ 82, 90,110]}, // B4 青みの石
+  {wall:[152,148,163], side:[120,117,131], floor:[113,110,124], ceil:[ 68, 67, 81], fog:[ 78, 80,106]}, // B5 紫がかる
+  {wall:[142,139,143], side:[112,110,114], floor:[105,103,107], ceil:[ 61, 60, 65], fog:[ 70, 72, 82]}, // B6 冷たい黒石
+];
+let WALL_BASE  = FLOOR_PALETTE[0].wall;   // 突き当りの壁（正面から光が当たる）
+let SIDE_BASE  = FLOOR_PALETTE[0].side;   // 側壁（斜めなので少し暗い）
+let FLOOR_BASE = FLOOR_PALETTE[0].floor;
+let CEIL_BASE  = FLOOR_PALETTE[0].ceil;
+// 現在の階層に合わせて色を差し替える。階層が変わるたびに呼ぶ
+function applyFloorPalette(){
+  const q=FLOOR_PALETTE[Math.min(floorIndex, FLOOR_PALETTE.length-1)] || FLOOR_PALETTE[0];
+  WALL_BASE=q.wall; SIDE_BASE=q.side; FLOOR_BASE=q.floor; CEIL_BASE=q.ceil;
+  FOG_DEEP=q.fog;
+}
 const COURSES    = 4;               // 石積みの段数（多すぎると方眼紙に見える）
 
 /* ---- 面の描画 ----------------------------------------------------
@@ -4423,7 +4466,7 @@ document.getElementById('overlayBtn').onclick=()=>{
   const wasLose=overlay.classList.contains('lose');
   let restoredFromSave=false;
   if(wasLose){
-    if(hasSave() && loadGame()){
+    if(hasSave() && loadGame(newestSlot())){
       // 最後に旅を記録した祭壇の状態まで引き戻す（レベル・所持品・階層を保持）
       restoredFromSave=true;
     }else{
@@ -5055,8 +5098,15 @@ document.getElementById('bTavernBack').onclick=closeTavern;
 document.getElementById('bTownToDungeon').onclick=closeTown;
 
 /* ---------- セーブ・ロード ---------- */
-const SAVE_KEY='twilight_sanctuary_v1';
-function saveGame(){
+/* セーブ枠は2つ。教会で刻む「記録」と、階層移動などで書かれる「自動記録」。
+   同じ枠を共有していると、良い記録の直後に潜って自動保存が上書きし、
+   そこで全滅すると戻れる場所が悪化してしまう。 */
+const SAVE_KEY='twilight_sanctuary_v1';        // 記録（教会）
+const SAVE_KEY_AUTO='twilight_sanctuary_auto'; // 自動記録
+const SLOT_KEY={manual:SAVE_KEY, auto:SAVE_KEY_AUTO};
+const SLOT_NAME={manual:'旅の記録', auto:'自動記録'};
+function saveGame(slot){
+  const key=SLOT_KEY[slot||'manual'];
   try{
     const data={
       v:1,
@@ -5082,16 +5132,34 @@ function saveGame(){
       chests: FLOORS.map(f=>(f.opened||[]).slice()),
       ts: Date.now()
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
     return true;
   }catch(e){ console.error(e); return false; }
 }
-function hasSave(){
-  try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; }
+function hasSlot(slot){
+  try{ return !!localStorage.getItem(SLOT_KEY[slot]); }catch(e){ return false; }
 }
-function loadGame(){
+function hasSave(){ return hasSlot('manual') || hasSlot('auto'); }
+// 記録の時刻。無ければ null
+function slotTime(slot){
   try{
-    const raw=localStorage.getItem(SAVE_KEY);
+    const raw=localStorage.getItem(SLOT_KEY[slot]);
+    if(!raw) return null;
+    const d=JSON.parse(raw);
+    return d.ts || null;
+  }catch(e){ return null; }
+}
+// 新しいほうの枠を返す（全滅からの復帰などで使う）
+function newestSlot(){
+  const a=slotTime('manual'), b=slotTime('auto');
+  if(a==null && b==null) return null;
+  if(a==null) return 'auto';
+  if(b==null) return 'manual';
+  return b>a ? 'auto' : 'manual';
+}
+function loadGame(slot){
+  try{
+    const raw=localStorage.getItem(SLOT_KEY[slot||newestSlot()||'manual']);
     if(!raw) return false;
     const d=JSON.parse(raw);
     party = d.party.map(m=>({
@@ -5103,6 +5171,7 @@ function loadGame(){
     gold=d.gold||0;
     floorIndex=d.floorIndex||0;
     MAP=FLOORS[floorIndex].grid; MW=MAP[0].length; MH=MAP.length;
+    applyFloorPalette();
     player.x=d.player.x; player.y=d.player.y; player.dir=d.player.dir; player.steps=d.player.steps||0;
     bossDefeated=!!d.bossDefeated;
     loop=d.loop||1;
@@ -5120,7 +5189,14 @@ function loadGame(){
     return true;
   }catch(e){ console.error(e); return false; }
 }
-function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function clearSave(){
+  try{ localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY_AUTO); }catch(e){}
+}
+function fmtTime(ts){
+  if(!ts) return null;
+  const dt=new Date(ts);
+  return `${dt.getMonth()+1}月${dt.getDate()}日 ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+}
 function saveTimestamp(){
   try{
     const raw=localStorage.getItem(SAVE_KEY);
@@ -5162,6 +5238,7 @@ function startNewGame(){
   inventory={};
   gold=0;
   floorIndex=0; MAP=FLOORS[0].grid; MW=MAP[0].length; MH=MAP.length;
+  applyFloorPalette();
   player.x=1; player.y=1; player.dir=1; player.steps=0;
   bossDefeated=false;
   loop=1;
@@ -5176,8 +5253,30 @@ function showPrologue(){
   hideView(elTitleView);
   showView(document.getElementById("prologueView"));
 }
-function continueGame(){
-  if(!loadGame()){
+// 記録が2つあるときは、どちらから再開するかを選ばせる
+function openContinueChoice(){
+  const slots=['manual','auto'].filter(hasSlot);
+  if(slots.length<=1){ continueGame(slots[0]); return; }
+  elSpellChoiceList.innerHTML='';
+  setChoiceTitle('どの記録から再開しますか');
+  slots.forEach(sl=>{
+    const t=fmtTime(slotTime(sl));
+    let where='';
+    try{
+      const d=JSON.parse(localStorage.getItem(SLOT_KEY[sl]));
+      const lv=d.party&&d.party[0]?d.party[0].level:'?';
+      where=`地下${(d.floorIndex||0)+1}階　Lv.${lv}　${d.gold||0} G`;
+    }catch(e){}
+    elSpellChoiceList.appendChild(choiceButton(
+      `${SLOT_NAME[sl]}　${t||''}`, where,
+      ()=>{ closeChoiceDialog(); continueGame(sl); }
+    ));
+  });
+  elSpellChoiceDialog.style.display='flex';
+}
+
+function continueGame(slot){
+  if(!loadGame(slot)){
     // 失敗したら新規へ
     startNewGame();
     return;
@@ -5212,9 +5311,7 @@ document.getElementById('bTitleNew').onclick=()=>{
   }
 };
 document.getElementById('bTitleContinue').onclick=()=>{
-  if(hasSave()){
-    continueGame();
-  }
+  if(hasSave()) openContinueChoice();
 };
 
 /* ---------- 起動 ---------- */
@@ -5226,6 +5323,8 @@ if(!hasSave()){
 }
 setSound(soundOn);
 loadSpriteImages();
+// ここまで来ればスクリプトは読み終わっている。覆いを外す
+{ const bv=document.getElementById('bootVeil'); if(bv) bv.classList.add('done'); }
 
 // 画面の縦横比に応じてレイアウトを切り替え（JSで判定するのでiOS制限の影響を受けない）
 function updateLandscape(){
