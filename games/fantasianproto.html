@@ -2362,8 +2362,8 @@ function fogSwallow(onCover, onDone){
   const H=elFxVeil.height=Math.max(1, Math.floor(window.innerHeight));
   elFxVeil.classList.add('on');
 
-  const IN=280, HOLD=80, OUT=260;   // 覆うまで / 覆いきったまま / 引くまで（ミリ秒）
-  const ARMS=5, PER=11;             // 渦の腕の数と、1本あたりの霧の玉
+  const IN=560, HOLD=120, OUT=460;  // 覆うまで / 覆いきったまま / 引くまで（ミリ秒）
+  const ARMS=6, PER=13;             // 渦の腕の数と、1本あたりの霧の玉
   const cx=W/2, cy=H/2;
   const Rmax=Math.hypot(W,H)*0.62;
   const rnd=mulberry32(20240822);
@@ -2372,13 +2372,26 @@ function fogSwallow(onCover, onDone){
   for(let a=0;a<ARMS;a++){
     for(let i=0;i<PER;i++){
       blobs.push({
-        arm:a*(Math.PI*2/ARMS),
+        arm:a*(Math.PI*2/ARMS)+rnd()*0.35,
         t0:i/PER,                       // 腕に沿った位置
         wob:rnd()*Math.PI*2,
-        size:0.10+rnd()*0.13,
+        spd:0.8+rnd()*0.5,              // 腕ごとに寄る速さを変えて、ひと塊に見せない
+        size:0.05+Math.pow(rnd(),2)*0.28, // 大小をばらけさせて、粒に見えないようにする
+        dim:0.65+rnd()*0.35,
       });
     }
   }
+  // 霧は縮小した面に描いてから引き伸ばす。輪郭がぼけて煙らしくなり、描画も軽い
+  const SUB=5;
+  const fogCv=document.createElement('canvas');
+  fogCv.width =Math.max(1, Math.round(W/SUB));
+  fogCv.height=Math.max(1, Math.round(H/SUB));
+  const fgCtx=fogCv.getContext('2d');
+  // 一気に引き伸ばすと縮小面の網目が出るので、途中の大きさを一段挟む
+  const midCv=document.createElement('canvas');
+  midCv.width =Math.max(1, Math.round(W/2));
+  midCv.height=Math.max(1, Math.round(H/2));
+  const mdCtx=midCv.getContext('2d');
   const t0=performance.now();
   let covered=false;
 
@@ -2399,34 +2412,50 @@ function fogSwallow(onCover, onDone){
     if(el>=total){ finish(); return; }
     // c=0 で透明、1 で完全に覆う。覆いきったあとは HOLD の間そのまま保つ
     let c;
-    if(el<IN)            c=Math.pow(el/IN, 1.6);
+    if(el<IN)            c=Math.pow(el/IN, 1.35);
     else if(el<IN+HOLD)  c=1;
-    else                 c=Math.pow(1-(el-IN-HOLD)/OUT, 1.4);
+    else                 c=Math.pow(1-(el-IN-HOLD)/OUT, 1.3);
     c=Math.max(0, Math.min(1, c));
-    const spin = (el/total)*Math.PI*2.2;
+    const spin = (el/total)*Math.PI*2.8;
 
     fxCtx.clearRect(0,0,W,H);
-    fxCtx.save();
+    fgCtx.clearRect(0,0,fogCv.width,fogCv.height);
     // 霧の玉を渦状に配置する。覆うにつれて中心へ寄り、大きくなる
+    const base=0.46*Math.min(1, c*1.3);
     blobs.forEach(b=>{
       const along = b.t0;
-      const r = Rmax*(along*(1-c*0.92)+0.04);
-      const ang = b.arm + spin + along*2.6 + Math.sin(b.wob+el*0.004)*0.18;
-      const x = cx+Math.cos(ang)*r;
-      const y = cy+Math.sin(ang)*r*0.82;
-      const rad = Math.max(2, W*b.size*(0.45+c*1.15));
-      const g=fxCtx.createRadialGradient(x,y,0,x,y,rad);
-      const a=0.52*c;
-      // 迷宮の闇を巻き上げたような、冷たく暗い霧
+      // 画面の外から湧いて、渦を巻きながら中央へ寄っていく
+      const pull = Math.min(1, c*b.spd);
+      const r = Rmax*((0.10+along*1.05)*(1-pull*0.93)+0.05);
+      const ang = b.arm + spin + along*2.6 + Math.sin(b.wob+el*0.0028)*0.22;
+      const x = (cx+Math.cos(ang)*r)/SUB;
+      const y = (cy+Math.sin(ang)*r*0.82)/SUB;
+      const rad = Math.max(1, W*b.size*(0.55+c*1.25)/SUB);
+      const a = base*b.dim;
+      // 迷宮の闇を巻き上げたような、冷たく暗い霧。
+      // 縁を段階的に薄くして、輪の見える円にならないようにする
+      const g=fgCtx.createRadialGradient(x,y,0,x,y,rad);
       g.addColorStop(0,   `rgba(74,72,92,${a})`);
-      g.addColorStop(0.5, `rgba(34,32,46,${a*0.78})`);
+      g.addColorStop(0.25,`rgba(52,50,66,${a*0.80})`);
+      g.addColorStop(0.45,`rgba(38,36,50,${a*0.58})`);
+      g.addColorStop(0.62,`rgba(30,28,40,${a*0.36})`);
+      g.addColorStop(0.78,`rgba(24,22,32,${a*0.17})`);
+      g.addColorStop(0.90,`rgba(20,18,28,${a*0.05})`);
       g.addColorStop(1,   'rgba(20,18,28,0)');
-      fxCtx.fillStyle=g;
-      fxCtx.beginPath(); fxCtx.arc(x,y,rad,0,Math.PI*2); fxCtx.fill();
+      fgCtx.fillStyle=g;
+      fgCtx.beginPath(); fgCtx.arc(x,y,rad,0,Math.PI*2); fgCtx.fill();
     });
-    // 覆いきる直前は全体を沈めて、切り替えの瞬間を隠す
-    if(c>0.6){
-      fxCtx.fillStyle=`rgba(12,11,18,${(c-0.6)/0.4})`;
+    mdCtx.clearRect(0,0,midCv.width,midCv.height);
+    mdCtx.imageSmoothingEnabled=true;
+    mdCtx.drawImage(fogCv,0,0,midCv.width,midCv.height);
+    fxCtx.save();
+    fxCtx.imageSmoothingEnabled=true;
+    fxCtx.drawImage(midCv,0,0,W,H);
+    // 霧が濃くなるのに合わせて全体を沈め、切り替えの瞬間を隠す。
+    // 一気に暗転すると閃光に見えるので、長めに時間をかけて滑らかに掛ける
+    if(c>0.45){
+      const w=(c-0.45)/0.55;
+      fxCtx.fillStyle=`rgba(12,11,18,${w*w*(3-2*w)})`;
       fxCtx.fillRect(0,0,W,H);
     }
     fxCtx.restore();
