@@ -444,6 +444,13 @@
     min-height:44px;color:var(--ink-soft);line-height:1.7;
   }
 
+  /* ---------- 場面転換の演出 ---------- */
+  #fxVeil{
+    position:fixed;inset:0;z-index:60;pointer-events:none;display:none;
+    width:100%;height:100%;
+  }
+  #fxVeil.on{display:block;}
+
   /* ---------- 読み込み中 ---------- */
   #bootVeil{
     position:absolute;inset:0;z-index:80;
@@ -1010,6 +1017,9 @@
       <button class="key" id="bHelpBack" style="max-width:240px;display:inline-block;width:100%;">戻る</button>
     </div>
   </div>
+
+  <!-- エンカウント演出用。普段は非表示 -->
+  <canvas id="fxVeil"></canvas>
 
   <!-- ============ 確認ダイアログ ============ -->
   <div id="confirmDialog" class="confirm-wrap" style="display:none;">
@@ -2332,6 +2342,105 @@ function openChest(){
   drawMinimap();
 }
 
+/* ===== エンカウントの霧 =====
+   四方から霧が渦を巻いて中央へ集まり、視界を呑んでから引く。
+   覆いきった瞬間に画面を切り替えるので、切り替わりの瞬間は見えない。 */
+const elFxVeil=document.getElementById('fxVeil');
+const fxCtx=elFxVeil?elFxVeil.getContext('2d'):null;
+let fxBusy=false;
+// 「少し間を置いてから霧を出す」場面でも、その間の操作は止めておく
+let encPending=false;
+function encLocked(){ return fxBusy || encPending; }
+function encSoon(delay, fn){ encPending=true; setTimeout(()=>{ encPending=false; fn(); }, delay); }
+
+function fogSwallow(onCover, onDone){
+  // 動きを控えたい設定なら演出を挟まない
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!fxCtx || fxBusy || reduce){ onCover&&onCover(); onDone&&onDone(); return; }
+  fxBusy=true;
+  const W=elFxVeil.width =Math.max(1, Math.floor(window.innerWidth));
+  const H=elFxVeil.height=Math.max(1, Math.floor(window.innerHeight));
+  elFxVeil.classList.add('on');
+
+  const IN=280, HOLD=80, OUT=260;   // 覆うまで / 覆いきったまま / 引くまで（ミリ秒）
+  const ARMS=5, PER=11;             // 渦の腕の数と、1本あたりの霧の玉
+  const cx=W/2, cy=H/2;
+  const Rmax=Math.hypot(W,H)*0.62;
+  const rnd=mulberry32(20240822);
+  // 玉の配置は毎回同じにして、ちらつきを避ける
+  const blobs=[];
+  for(let a=0;a<ARMS;a++){
+    for(let i=0;i<PER;i++){
+      blobs.push({
+        arm:a*(Math.PI*2/ARMS),
+        t0:i/PER,                       // 腕に沿った位置
+        wob:rnd()*Math.PI*2,
+        size:0.10+rnd()*0.13,
+      });
+    }
+  }
+  const t0=performance.now();
+  let covered=false;
+
+  // 描画で何が起きても、戦闘開始と後片付けだけは必ず通す
+  function finish(){
+    if(!fxBusy) return;
+    try{ fxCtx.clearRect(0,0,W,H); }catch(e){}
+    elFxVeil.classList.remove('on');
+    fxBusy=false;
+    if(!covered){ covered=true; onCover&&onCover(); }
+    onDone&&onDone();
+  }
+
+  function frame(now){
+    // requestAnimationFrame の時刻は開始時刻より前を指すことがあるので、負にしない
+    const el=Math.max(0, now-t0);
+    const total=IN+HOLD+OUT;
+    if(el>=total){ finish(); return; }
+    // c=0 で透明、1 で完全に覆う。覆いきったあとは HOLD の間そのまま保つ
+    let c;
+    if(el<IN)            c=Math.pow(el/IN, 1.6);
+    else if(el<IN+HOLD)  c=1;
+    else                 c=Math.pow(1-(el-IN-HOLD)/OUT, 1.4);
+    c=Math.max(0, Math.min(1, c));
+    const spin = (el/total)*Math.PI*2.2;
+
+    fxCtx.clearRect(0,0,W,H);
+    fxCtx.save();
+    // 霧の玉を渦状に配置する。覆うにつれて中心へ寄り、大きくなる
+    blobs.forEach(b=>{
+      const along = b.t0;
+      const r = Rmax*(along*(1-c*0.92)+0.04);
+      const ang = b.arm + spin + along*2.6 + Math.sin(b.wob+el*0.004)*0.18;
+      const x = cx+Math.cos(ang)*r;
+      const y = cy+Math.sin(ang)*r*0.82;
+      const rad = Math.max(2, W*b.size*(0.45+c*1.15));
+      const g=fxCtx.createRadialGradient(x,y,0,x,y,rad);
+      const a=0.52*c;
+      // 迷宮の闇を巻き上げたような、冷たく暗い霧
+      g.addColorStop(0,   `rgba(74,72,92,${a})`);
+      g.addColorStop(0.5, `rgba(34,32,46,${a*0.78})`);
+      g.addColorStop(1,   'rgba(20,18,28,0)');
+      fxCtx.fillStyle=g;
+      fxCtx.beginPath(); fxCtx.arc(x,y,rad,0,Math.PI*2); fxCtx.fill();
+    });
+    // 覆いきる直前は全体を沈めて、切り替えの瞬間を隠す
+    if(c>0.6){
+      fxCtx.fillStyle=`rgba(12,11,18,${(c-0.6)/0.4})`;
+      fxCtx.fillRect(0,0,W,H);
+    }
+    fxCtx.restore();
+
+    if(!covered && el>=IN){ covered=true; onCover&&onCover(); }
+    requestAnimationFrame(safeFrame);
+  }
+  function safeFrame(now){
+    try{ frame(now); }
+    catch(e){ finish(); }
+  }
+  requestAnimationFrame(safeFrame);
+}
+
 /* ---------- 探索 操作 ---------- */
 function refreshHud(){
   elPos.textContent=`地下${floorIndex+1}階`;
@@ -2359,6 +2468,7 @@ function refreshHud(){
 }
 
 function turn(delta){
+  if(encLocked()) return;         // 演出の最中は操作を受け付けない
   player.dir=(player.dir+delta+4)%4;
   drawDungeon(); refreshHud();
 }
@@ -2377,6 +2487,7 @@ document.getElementById('confirmYes').onclick=()=>{ const cb=confirmYesCb; close
 document.getElementById('confirmNo').onclick =()=>{ const cb=confirmNoCb;  closeConfirm(); if(cb) cb(); };
 
 function move(forward){
+  if(encLocked()) return;         // 霧に呑まれている間は進めない
   const fwd=DIRS[player.dir];
   const sign=forward?1:-1;
   const nx=player.x+fwd.dx*sign, ny=player.y+fwd.dy*sign;
@@ -2425,7 +2536,7 @@ function move(forward){
     if(mb && !mb.defeated && party.some(u=>u.hp>0)){
       SFX.encount();
       elExploreLog.textContent='階段の前。何かが立ちはだかっている……。';
-      setTimeout(()=>startBattle(false, mb.key), 350);
+      encSoon(350, ()=>fogSwallow(()=>startBattle(false, mb.key)));
       return;
     }
     SFX.dialog();
@@ -2465,14 +2576,14 @@ function move(forward){
   if(f.altar && player.x===f.altar.x && player.y===f.altar.y && !bossDefeated && party.some(u=>u.hp>0)){
     SFX.encount();
     elExploreLog.textContent='床に古い魔法陣。踏み込むと、奥から巨大な気配が……。';
-    setTimeout(()=>startBattle(true), 350);
+    encSoon(350, ()=>fogSwallow(()=>startBattle(true)));
     return;
   }
   // ランダムエンカウント（深い階ほど確率微増）
   const encRate=0.24+floorIndex*0.04;
   if(forward && Math.random()<encRate && party.some(u=>u.hp>0)){
     SFX.encount();
-    startBattle(false);
+    fogSwallow(()=>startBattle(false));
   } else {
     // ボスのいる階では魔法陣への距離でヒント
     if(!bossDefeated && f.altar){
