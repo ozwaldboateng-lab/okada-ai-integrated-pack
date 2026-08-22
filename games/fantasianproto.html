@@ -818,6 +818,7 @@
         <button class="key title-btn" id="bTitleContinue">続きから</button>
         <button class="key title-btn" id="bTitleHelp">遊び方</button>
         <button class="key title-btn" id="bTitleSound">音：オン</button>
+        <button class="key title-btn" id="bTitleMusic">音楽：オン</button>
       </div>
       <div class="title-foot">RUISARD CODEX · ver 1.0</div>
     </div>
@@ -920,6 +921,7 @@
     <div class="town-utils">
       <button class="key" id="bTownHelp">遊び方</button>
       <button class="key" id="bTownSound">音：オン</button>
+      <button class="key" id="bTownMusic">音楽：オン</button>
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="key" id="bTownToDungeon" style="max-width:240px;display:inline-block;width:100%;">迷宮へ降りる</button>
@@ -1122,6 +1124,8 @@ function setSound(on){
   try{ localStorage.setItem(SOUND_KEY, soundOn?'on':'off'); }catch(e){}
   const label='音：'+(soundOn?'オン':'オフ');
   ['bTitleSound','bTownSound'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent=label; });
+  // 音を止めたら音楽も止める。戻したら鳴っていた曲を再開する
+  if(typeof BGM!=='undefined'){ if(soundOn) BGM.resume(); else BGM.stop(0.3); }
 }
 
 function tone({f=440, f2=null, dur=0.18, type='sine', vol=0.18, attack=0.005, decay=null}={}){
@@ -1193,6 +1197,175 @@ const SFX={
     setTimeout(()=>{ [784,1047,1319].forEach((f,i)=>setTimeout(()=>tone({f, dur:0.7, type:'sine', vol:0.14}), i*110)); }, 900);
   },
 };
+
+/* ===== BGM =====
+   外部ファイルを持たない方針なので、Web Audio で組み立てて鳴らす。
+   setTimeout では音がよれるため、AudioContext の時計を見て
+   少し先まで音符を予約していく（先読みスケジューラ）。 */
+const BGM=(()=>{
+  const MIDI = n => 440*Math.pow(2,(n-69)/12);   // MIDIノート番号 → Hz
+  let master=null, bus=null, timer=null;
+  let track=null, nextT=0, stepIx=0, drones=[];
+  let musicOn=true;
+  try{ musicOn = localStorage.getItem('twilight_music')!=='off'; }catch(e){}
+
+  function ensure(){
+    const ctx=ac(); if(!ctx) return null;
+    if(!master){
+      master=ctx.createGain(); master.gain.value=0;
+      // 効果音より奥に置きたいので、少し丸めてから出す
+      bus=ctx.createBiquadFilter(); bus.type='lowpass'; bus.frequency.value=5200;
+      bus.connect(master); master.connect(ctx.destination);
+    }
+    return ctx;
+  }
+
+  // ---- 音色 ----
+  function voice(t, freq, dur, type, vol, cutoff, detune){
+    const ctx=ensure(); if(!ctx) return;
+    const o=ctx.createOscillator(); o.type=type; o.frequency.value=freq;
+    if(detune) o.detune.value=detune;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vol,t+Math.min(0.03,dur*0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    let last=o;
+    if(cutoff){
+      const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=cutoff;
+      o.connect(f); last=f;
+    }
+    last.connect(g); g.connect(bus);
+    o.start(t); o.stop(t+dur+0.03);
+  }
+  function hit(t, dur, vol, hpf, lpf){
+    const ctx=ensure(); if(!ctx) return;
+    const n=Math.floor(ctx.sampleRate*dur);
+    const buf=ctx.createBuffer(1,n,ctx.sampleRate); const d=buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=hpf;
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass';  lp.frequency.value=lpf;
+    const g=ctx.createGain(); g.gain.value=vol;
+    src.connect(hp).connect(lp).connect(g).connect(bus);
+    src.start(t); src.stop(t+dur+0.02);
+  }
+  // 持続音（ドローン）。曲を止めるまで鳴り続ける
+  function drone(freq, type, vol, cutoff, detune){
+    const ctx=ensure(); if(!ctx) return;
+    const o=ctx.createOscillator(); o.type=type; o.frequency.value=freq;
+    if(detune) o.detune.value=detune;
+    const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=cutoff;
+    const g=ctx.createGain(); g.gain.value=0.0001;
+    o.connect(f).connect(g).connect(bus);
+    g.gain.linearRampToValueAtTime(vol, ctx.currentTime+2.5);
+    o.start();
+    drones.push({o,g});
+  }
+  function killDrones(){
+    const ctx=ensure();
+    drones.forEach(({o,g})=>{
+      try{
+        if(ctx) g.gain.linearRampToValueAtTime(0.0001, ctx.currentTime+0.5);
+        o.stop((ctx?ctx.currentTime:0)+0.6);
+      }catch(e){}
+    });
+    drones=[];
+  }
+
+  /* ---- 迷宮：不穏に ----
+     低い持続音の上に、たまに不協和な鐘が落ちてくる。
+     短二度と三全音を混ぜると落ち着かない響きになる。 */
+  const D_ROOT=38;                                   // D2
+  const DUNGEON={
+    dt:0.62, steps:32,
+    start(){
+      drone(MIDI(D_ROOT-12), 'sawtooth', 0.16, 260);        // 基音
+      drone(MIDI(D_ROOT),    'sawtooth', 0.115, 420, +7);    // わずかに離調させて唸らせる
+      drone(MIDI(D_ROOT-5),  'triangle', 0.090, 380);        // 五度
+    },
+    step(t, i){
+      // 三全音（不安の音）をときどき下から差し込む
+      if(i===0)  voice(t, MIDI(D_ROOT+6),  3.2, 'triangle', 0.095, 560);
+      if(i===16) voice(t, MIDI(D_ROOT+1),  2.6, 'triangle', 0.085, 500);
+      // まばらな鐘。等間隔にしないことで「何かがいる」感じを出す
+      const bells={3:62, 9:65, 13:68, 19:61, 25:66, 29:70};
+      if(bells[i]) voice(t, MIDI(bells[i]), 1.8, 'sine', 0.115, 3000);
+      // 遠くの物音
+      if(i===7 || i===22) hit(t, 0.35, 0.060, 120, 700);
+    }
+  };
+
+  /* ---- 戦闘：激しく ----
+     八分刻みのベースに打楽器を重ね、和声的短音階の旋律を乗せる。 */
+  const B_ROOT=38;
+  const BASS=[0,0,7,0, 0,0,10,0, 0,0,7,0, 5,5,3,3];        // ルートからの半音差
+  const LEAD=[null,null,null,null, 12,15,14,12, null,null,null,null, 17,15,14,12,
+              null,null,null,null, 12,15,17,19, null,null,null,null, 18,17,15,14];
+  const BATTLE={
+    dt:0.1364, steps:32,                                     // ≒ 220 BPM の八分
+    start(){},
+    step(t, i){
+      // ベース
+      const b=BASS[i%16];
+      voice(t, MIDI(B_ROOT+b), 0.13, 'sawtooth', 0.165, 1200);
+      // 打楽器
+      if(i%8===0)          hit(t, 0.11, 0.170, 40, 220);     // キック
+      if(i%8===4)          hit(t, 0.13, 0.115, 900, 6500);   // スネア
+      if(i%2===1)          hit(t, 0.035, 0.032, 5000, 12000);// ハイハット
+      // 旋律
+      const m=LEAD[i];
+      if(m!=null) voice(t, MIDI(B_ROOT+12+m), 0.30, 'square', 0.090, 3400);
+      // 2小節ごとに刻みを足して煽る
+      if(i===30 || i===31) hit(t, 0.06, 0.085, 700, 5000);
+    }
+  };
+
+  const TRACKS={dungeon:DUNGEON, battle:BATTLE};
+
+  function tick(){
+    const ctx=ensure(); if(!ctx || !track) return;
+    const ahead=ctx.currentTime+0.2;
+    let guard=0;
+    while(nextT<ahead && guard++<64){
+      try{ track.step(nextT, stepIx % track.steps); }catch(e){}
+      nextT+=track.dt; stepIx++;
+    }
+  }
+
+  function stop(fade){
+    const ctx=ensure();
+    if(ctx && master) master.gain.linearRampToValueAtTime(0.0001, ctx.currentTime+(fade===undefined?0.5:fade));
+    killDrones();
+    if(timer){ clearInterval(timer); timer=null; }
+    track=null;
+  }
+
+  let want=null;   // 鳴らしたい曲。音を切っている間も覚えておく
+  function play(name){
+    want=name;
+    if(!musicOn || !soundOn) return;
+    const ctx=ensure(); if(!ctx) return;
+    if(track===TRACKS[name] && timer) return;      // 既に同じ曲
+    stop(0.18);
+    const t=TRACKS[name]; if(!t) return;
+    track=t; stepIx=0; nextT=ctx.currentTime+0.12;
+    try{ t.start(); }catch(e){}
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0.42, ctx.currentTime+0.8);
+    timer=setInterval(tick, 40);
+    tick();
+  }
+  function setMusic(v){
+    musicOn=!!v;
+    try{ localStorage.setItem('twilight_music', musicOn?'on':'off'); }catch(e){}
+    const label='音楽：'+(musicOn?'オン':'オフ');
+    ['bTitleMusic','bTownMusic'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent=label; });
+    if(musicOn){ if(want) play(want); } else stop(0.3);
+  }
+  return {play, stop, setMusic, isOn:()=>musicOn, resume:()=>{ if(want) play(want); }};
+})();
+
 
 /* ===== ダンジョン（3階層・固定設計） =====
    記号: # 壁 / . 通路 / > 下り階段 / < 上り階段 / * 魔法陣（ボス） */
@@ -2966,6 +3139,7 @@ function startBattle(isBoss, midbossKey){
     }
   }
   phase='player';
+  BGM.play('battle');
   selected=null; reachable=[]; attackable=[];
   spellAiming=false; spellTargets=[];
   units.forEach(u=>u.acted=false);
@@ -4169,6 +4343,7 @@ function doFlee(guaranteed){
     // 逃走時も戦闘中のHPを持ち帰る（同行者含む）
     units.filter(u=>u.side==='ally'&&u.ref).forEach(u=>{ u.ref.hp=Math.max(0,u.hp); });
     clearSelection();
+    BGM.play('dungeon');
     hideView(elBattleView);
     showView(elExploreView);
     elExploreLog.textContent = guaranteed
@@ -4482,6 +4657,7 @@ document.getElementById('overlayBtn').onclick=()=>{
   }
   hideView(elBattleView);
   showView(elExploreView);
+  BGM.play('dungeon');
   overlay.style.display='none';
   if(wasClear){
     elExploreLog.textContent='古竜は斃れた。聖域に、もう霧の気配はない。（クリア後も探索を続けられます）';
@@ -4652,6 +4828,7 @@ const elShopLog=document.getElementById('shopLog');
 const elShopList=document.getElementById('shopList');
 
 function openTown(){
+  BGM.stop();          // 町では音楽を止める（束の間の安息）
   autoSave();          // 町に着いた時点を自動で記録
   hideView(elExploreView);
   hideView(elBattleView);
@@ -4669,6 +4846,7 @@ function openTown(){
   elTownLog.textContent='日が差している。ここではしばし、霧の脅威を忘れていられる。';
 }
 function closeTown(){
+  BGM.play('dungeon');
   // ドラゴンを倒した状態で町から降りる＝次の周回へ
   if(bossDefeated){
     loop++;
@@ -5228,6 +5406,8 @@ document.getElementById('bTitleHelp').onclick=()=>openHelp(elTitleView);
 document.getElementById('bTownHelp').onclick=()=>openHelp(elTownView);
 document.getElementById('bTitleSound').onclick=()=>setSound(!soundOn);
 document.getElementById('bTownSound').onclick=()=>setSound(!soundOn);
+document.getElementById('bTitleMusic').onclick=()=>BGM.setMusic(!BGM.isOn());
+document.getElementById('bTownMusic').onclick=()=>BGM.setMusic(!BGM.isOn());
 
 /* ---------- タイトル ---------- */
 const elTitleView=document.getElementById('titleView');
@@ -5285,6 +5465,7 @@ function continueGame(slot){
 }
 function enterMainGame(){
   hideView(elTitleView);
+  BGM.play('dungeon');
   hideView(document.getElementById("prologueView"));
   elMainTitlebar.style.display='';
   showView(elExploreView);
@@ -5322,6 +5503,7 @@ if(!hasSave()){
   continueBtn.textContent='続きから（記録なし）';
 }
 setSound(soundOn);
+BGM.setMusic(BGM.isOn());   // ボタンの文言を現在の設定に合わせる
 loadSpriteImages();
 // ここまで来ればスクリプトは読み終わっている。覆いを外す
 { const bv=document.getElementById('bootVeil'); if(bv) bv.classList.add('done'); }
