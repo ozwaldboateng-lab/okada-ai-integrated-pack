@@ -991,6 +991,13 @@
       <h3>戦闘</h3>
       <p>自分の駒を選ぶと、<span class="hl-move">青のマス</span>が移動先、<span class="hl-atk">赤の敵</span>が攻撃できる相手。<br>
          全員が行動すると敵の番になる。1ターンに1体ずつ、移動と攻撃を選んでいく。</p>
+      <p>戦場には<b>地形</b>がある。空きマスに触れると、その効果を確かめられる。</p>
+      <table class="help-keys">
+        <tr><td>瓦礫</td><td>通り抜けられない。矢と魔法は越えていく</td></tr>
+        <tr><td>水たまり</td><td>移動に2かかる。攻撃 −15%・防御 −25%、反撃も出ない</td></tr>
+        <tr><td>崩れた石壁</td><td>移動に2かかるが、<b>防御 +30%</b>。守りを固める場所</td></tr>
+        <tr><td>魔力溜まり</td><td>そこで唱えた魔法と回復が <b>+25%</b></td></tr>
+      </table>
       <table class="help-keys">
         <tr><td>魔法</td><td>撃つたびに<b>魔力</b>を消費する。宿屋で眠るか、魔力の雫で戻る</td></tr>
         <tr><td>道具</td><td>選んだ駒の行動を使って、傷薬などを使う</td></tr>
@@ -3202,6 +3209,120 @@ function applyLoopMult(enemy){
   return enemy;
 }
 
+/* ===== 戦場の地形 =====
+   空き地だけの盤面では「どこに立つか」に意味がなく、最適手が常に
+   「最寄りの敵へ寄って殴る」に収束してしまう。
+   移動コストと攻防補正を持つマスを撒いて、立ち位置に判断を持たせる。
+   罰則だけのマスは誰も選ばないので、得のあるマスと損のあるマスを混ぜる。 */
+const TERRAIN={
+  plain: {name:'石床',       cost:1, atk:1.00, taken:1.00, spell:1.00, block:false,
+          desc:'ただの石畳。'},
+  rubble:{name:'瓦礫',       cost:1, atk:1.00, taken:1.00, spell:1.00, block:true,
+          desc:'崩れ落ちた柱。通り抜けられない（矢や魔法は越えられる）。'},
+  water: {name:'水たまり',   cost:2, atk:0.85, taken:1.25, spell:1.00, block:false, noCounter:true,
+          desc:'足を取られる。移動2・与える攻撃 −15%・受ける傷 +25%・反撃できない。'},
+  cover: {name:'崩れた石壁', cost:2, atk:1.00, taken:0.75, spell:1.00, block:false,
+          desc:'身を隠せる。移動2・受ける傷 −25%。'},
+  mana:  {name:'魔力溜まり', cost:1, atk:1.00, taken:1.00, spell:1.25, block:false,
+          desc:'古い術式の名残。魔法と回復の威力 +25%。'},
+};
+// 階層ごとの地形。数値は「対の数」で、盤面は180度回転で対称に置く
+const FLOOR_TERRAIN=[
+  {rubble:3, cover:2, water:0, mana:1},  // 地下1階：崩れかけの回廊
+  {rubble:2, cover:3, water:1, mana:1},  // 地下2階：石積みの広間
+  {rubble:1, cover:1, water:4, mana:1},  // 地下3階：水没した聖堂
+  {rubble:3, cover:2, water:2, mana:1},  // 地下4階：崩落した坑道
+  {rubble:2, cover:3, water:1, mana:2},  // 地下5階：術者の工房跡
+  {rubble:2, cover:2, water:2, mana:2},  // 地下6階：焼け落ちた祭殿
+];
+let terrainGrid=[];   // terrainGrid[y][x] = TERRAIN のキー
+
+function terrainKeyAt(x,y){
+  if(x<0||y<0||x>=BG||y>=BH_) return 'plain';
+  const row=terrainGrid[y];
+  return (row && row[x]) || 'plain';
+}
+function terrainAt(x,y){ return TERRAIN[terrainKeyAt(x,y)] || TERRAIN.plain; }
+function terrainOf(u){ return u ? terrainAt(u.x,u.y) : TERRAIN.plain; }
+function isBlocked(x,y){ return terrainAt(x,y).block; }
+function moveCost(x,y){ return terrainAt(x,y).cost || 1; }
+
+/* 地形を織り込んだ実効値。
+   防御そのものを増減させると、ダメージが「攻撃−防御」の引き算である以上、
+   防御の高い終盤の敵ほど石壁の恩恵が跳ね上がってしまう。
+   そこで守りの補正は「受ける傷の割合」として最後に掛ける。 */
+function effAtkOf(u){ return Math.max(1, Math.round(u.atk*terrainOf(u).atk)); }
+function takenMulOf(u){ return terrainOf(u).taken || 1; }
+function spellMulOf(u){ return terrainOf(u).spell || 1; }
+// 地形を通したあとの実ダメージ
+function applyTaken(raw, target){ return Math.max(1, Math.round(raw*takenMulOf(target))); }
+// AI が「そこから殴ったらどれだけ通るか」を見積もるための値
+function expectedHit(atk, target){ return applyTaken(atk-target.def, target); }
+
+function clearTerrain(){
+  terrainGrid=[];
+  for(let y=0;y<BH_;y++) terrainGrid.push(new Array(BG).fill('plain'));
+}
+
+// 味方陣（下端）から敵陣（上端）まで、瓦礫を避けて辿り着けるか
+function terrainConnected(){
+  const seen={}, q=[];
+  for(let x=0;x<BG;x++) if(!isBlocked(x,BH_-1)){ seen[x+','+(BH_-1)]=1; q.push([x,BH_-1]); }
+  while(q.length){
+    const [x,y]=q.shift();
+    if(y===0) return true;
+    const nb=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(let i=0;i<nb.length;i++){
+      const nx=x+nb[i][0], ny=y+nb[i][1];
+      if(nx<0||ny<0||nx>=BG||ny>=BH_) continue;
+      if(isBlocked(nx,ny)) continue;
+      const k=nx+','+ny;
+      if(seen[k]) continue;
+      seen[k]=1; q.push([nx,ny]);
+    }
+  }
+  return false;
+}
+
+/* 地形を撒く。駒を並べたあとに呼ぶこと（陣地と駒の上には置かない）。
+   180度回転で対称に置くので、どちらの側にも同じ地形が同じだけ回る。
+
+   ボス戦では瓦礫を置かない。相手が遠くから魔法を撃つ一体なので、
+   壁で道を塞ぐと「近づけないまま削られる」だけになり、
+   判断の余地ではなく手詰まりを生んでしまう。 */
+function generateTerrain(fi, bossFight){
+  const plan=FLOOR_TERRAIN[Math.max(0, Math.min(FLOOR_TERRAIN.length-1, fi))] || FLOOR_TERRAIN[0];
+  const rubblePairs = bossFight ? 0 : (plan.rubble||0);
+  const Y0=2, Y1=BH_-3;          // 上下2行ずつは陣地として空けておく
+  for(let attempt=0; attempt<12; attempt++){
+    clearTerrain();
+    const taken={};
+    const put=(key,pairs)=>{
+      for(let n=0;n<pairs;n++){
+        for(let tries=0;tries<40;tries++){
+          const x=Math.floor(Math.random()*BG);
+          const y=Y0+Math.floor(Math.random()*(Y1-Y0+1));
+          const mx=BG-1-x, my=BH_-1-y;
+          const a=x+','+y, b=mx+','+my;
+          if(a===b) continue;
+          if(taken[a]||taken[b]) continue;
+          if(occupant(x,y)||occupant(mx,my)) continue;
+          taken[a]=1; taken[b]=1;
+          terrainGrid[y][x]=key; terrainGrid[my][mx]=key;
+          break;
+        }
+      }
+    };
+    put('rubble', rubblePairs);
+    put('cover',  plan.cover ||0);
+    put('water',  plan.water ||0);
+    put('mana',   plan.mana  ||0);
+    if(terrainConnected()) return;
+  }
+  // 通り抜けられる盤面がどうしても作れなければ、瓦礫だけ諦める
+  for(let y=0;y<BH_;y++) for(let x=0;x<BG;x++) if(terrainGrid[y][x]==='rubble') terrainGrid[y][x]='plain';
+}
+
 function startBattle(isBoss, midbossKey){
   // パーティ配置（下側）
   units=[];
@@ -3278,6 +3399,7 @@ function startBattle(isBoss, midbossKey){
       units.push(applyLoopMult(applyFloorScale({...t, side:'foe', x:cols[i], y:1+(i%2), acted:false, alive:true}, floorIndex)));
     }
   }
+  generateTerrain(floorIndex, !!(isBoss||midbossKey));
   phase='player';
   BGM.play('battle');
   selected=null; reachable=[]; attackable=[];
@@ -3310,6 +3432,96 @@ function startBattle(isBoss, midbossKey){
 }
 
 function occupant(x,y){ return units.find(u=>u.alive && u.x===x && u.y===y); }
+
+/* 地形一枚の描き分け。石畳と同じ水彩の調子を保ちつつ、
+   ひと目で「通れない・遅い・守れる・魔力が濃い」が分かるようにする。 */
+function drawTerrainTile(px,py,kind,rnd){
+  const T=TILE;
+  if(kind==='rubble'){
+    // 崩れ落ちた柱。床より明らかに暗く、影を落として「塞がっている」ことを示す
+    bctx.fillStyle='rgba(14,17,19,.78)';
+    bctx.fillRect(px,py,T,T);
+    const blocks=[[0.04,0.26,0.46,0.64],[0.44,0.08,0.48,0.50],[0.18,0.58,0.60,0.36]];
+    const face=['#4a504b','#565d56','#3d433e'];
+    blocks.forEach((b,i)=>{
+      const bx=px+T*b[0], by=py+T*b[1], bw=T*b[2], bh=T*b[3];
+      // 落ち影
+      bctx.fillStyle='rgba(8,10,12,.55)';
+      bctx.fillRect(bx+T*0.05, by+T*0.06, bw, bh);
+      bctx.fillStyle=face[i];
+      bctx.fillRect(bx,by,bw,bh);
+      bctx.fillStyle='rgba(214,220,214,.20)';
+      bctx.fillRect(bx,by,bw,Math.max(1,T*0.06));
+      bctx.fillStyle='rgba(6,8,10,.42)';
+      bctx.fillRect(bx,by+bh-Math.max(1,T*0.08),bw,Math.max(1,T*0.08));
+      bctx.strokeStyle='rgba(10,13,15,.72)'; bctx.lineWidth=1;
+      bctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+      // 割れ目
+      bctx.strokeStyle='rgba(12,15,17,.45)';
+      bctx.beginPath();
+      bctx.moveTo(bx+bw*0.35, by); bctx.lineTo(bx+bw*0.45, by+bh);
+      bctx.stroke();
+    });
+    bctx.strokeStyle='rgba(8,10,12,.62)'; bctx.lineWidth=2;
+    bctx.strokeRect(px+1,py+1,T-2,T-2);
+  }else if(kind==='water'){
+    // 澱んだ水。透けた石畳の上に暗い水面と反射を重ねる
+    bctx.fillStyle='rgba(32,58,64,.58)';
+    bctx.fillRect(px,py,T,T);
+    wash(bctx,px+T*0.42,py+T*0.46,T*0.36,T*0.26,'#16323a',0.30,rnd,5);
+    bctx.strokeStyle='rgba(176,214,214,.34)'; bctx.lineWidth=Math.max(1,T*0.035);
+    for(let i=0;i<3;i++){
+      const ly=py+T*(0.28+i*0.22)+ (rnd()-0.5)*T*0.05;
+      const lx=px+T*(0.14+rnd()*0.12), lw=T*(0.34+rnd()*0.28);
+      bctx.beginPath(); bctx.moveTo(lx,ly); bctx.lineTo(lx+lw,ly); bctx.stroke();
+    }
+    bctx.strokeStyle='rgba(14,30,34,.42)'; bctx.lineWidth=1;
+    bctx.strokeRect(px+0.5,py+0.5,T-1,T-1);
+  }else if(kind==='cover'){
+    // 腰までの崩れた石壁。上端を不揃いにして、身を隠せる高さの遮蔽物に見せる
+    const top=py+T*0.30, bot=py+T*0.86;
+    // 壁の手前に落ちる影
+    bctx.fillStyle='rgba(12,16,18,.42)';
+    bctx.fillRect(px+T*0.04, bot-T*0.04, T*0.94, T*0.16);
+    const cols=4, cw=T*0.90/cols, x0=px+T*0.05;
+    const rise=[0.00,0.12,0.04,0.16];
+    for(let i=0;i<cols;i++){
+      const by=top+T*rise[i], bx=x0+i*cw;
+      bctx.fillStyle=['#5f665f','#565d57','#646b63','#515851'][i];
+      bctx.fillRect(bx,by,cw,bot-by);
+      bctx.fillStyle='rgba(216,222,214,.26)';
+      bctx.fillRect(bx,by,cw,Math.max(1,T*0.055));
+      bctx.fillStyle='rgba(10,13,15,.34)';
+      bctx.fillRect(bx,bot-Math.max(1,T*0.07),cw,Math.max(1,T*0.07));
+      bctx.strokeStyle='rgba(22,27,26,.55)'; bctx.lineWidth=1;
+      bctx.strokeRect(bx+0.5,by+0.5,cw-1,bot-by-1);
+    }
+    // 積んだ石らしく横の目地を通す
+    bctx.strokeStyle='rgba(22,27,26,.48)'; bctx.lineWidth=1;
+    bctx.beginPath();
+    bctx.moveTo(x0, bot-T*0.20); bctx.lineTo(x0+T*0.90, bot-T*0.20);
+    bctx.stroke();
+  }else if(kind==='mana'){
+    // 床に残る術式。淡い紫の光と、二重の環
+    const cx=px+T*0.5, cy=py+T*0.5;
+    const g=bctx.createRadialGradient(cx,cy,T*0.05,cx,cy,T*0.52);
+    g.addColorStop(0,'rgba(168,140,222,.42)');
+    g.addColorStop(0.6,'rgba(118,96,178,.22)');
+    g.addColorStop(1,'rgba(96,78,150,0)');
+    bctx.fillStyle=g; bctx.fillRect(px,py,T,T);
+    bctx.strokeStyle='rgba(206,186,246,.55)'; bctx.lineWidth=Math.max(1,T*0.035);
+    bctx.beginPath(); bctx.arc(cx,cy,T*0.30,0,Math.PI*2); bctx.stroke();
+    bctx.strokeStyle='rgba(206,186,246,.30)'; bctx.lineWidth=1;
+    bctx.beginPath(); bctx.arc(cx,cy,T*0.40,0,Math.PI*2); bctx.stroke();
+    for(let i=0;i<4;i++){
+      const a2=i*Math.PI/2+Math.PI/4;
+      bctx.beginPath();
+      bctx.moveTo(cx+Math.cos(a2)*T*0.30, cy+Math.sin(a2)*T*0.30);
+      bctx.lineTo(cx+Math.cos(a2)*T*0.40, cy+Math.sin(a2)*T*0.40);
+      bctx.stroke();
+    }
+  }
+}
 
 function drawBattle(){
   bctx.clearRect(0,0,bCanvas.width,bCanvas.height);
@@ -3359,6 +3571,15 @@ function drawBattle(){
   mist.addColorStop(0,'rgba(200,206,202,0)');
   mist.addColorStop(1,'rgba(150,160,162,.28)');
   bctx.fillStyle=mist; bctx.fillRect(0,0,bCanvas.width,bCanvas.height);
+
+  // 地形は霧のあとに重ねる。先に描くと白く飛んで、瓦礫が透明な板に見える
+  for(let y=0;y<BH_;y++){
+    for(let x=0;x<BG;x++){
+      const tk=terrainKeyAt(x,y);
+      if(tk==='plain') continue;
+      drawTerrainTile(BOFFX+x*TILE, BOFFY+y*TILE, tk, mulberry32((x*73856093)^(y*19349663)));
+    }
+  }
 
   // 移動可能マス
   reachable.forEach(c=>{
@@ -3461,22 +3682,29 @@ const var_amber='#ffcf4a';
 
 /* ---- 到達可能マス（BFS、斜め無し、敵で塞がる） ---- */
 function computeReachable(u){
-  const res=[]; const seen={};
+  // マスごとに移動コストが違うので、幅優先ではなく最小コストで広げる
+  const res=[], best={};
   const key=(x,y)=>x+','+y;
-  let frontier=[{x:u.x,y:u.y,d:0}];
-  seen[key(u.x,u.y)]=0;
-  while(frontier.length){
-    const cur=frontier.shift();
-    if(cur.d>0 && !occupant(cur.x,cur.y)) res.push({x:cur.x,y:cur.y});
-    if(cur.d===u.mov) continue;
+  best[key(u.x,u.y)]=0;
+  const open=[{x:u.x,y:u.y,c:0}];
+  while(open.length){
+    // 盤が小さいので、毎回いちばん安いものを線形に取り出すだけで足りる
+    let bi=0;
+    for(let i=1;i<open.length;i++) if(open[i].c<open[bi].c) bi=i;
+    const cur=open.splice(bi,1)[0];
+    const bk=best[key(cur.x,cur.y)];
+    if(bk!==undefined && cur.c>bk) continue;
+    if(cur.c>0 && !occupant(cur.x,cur.y)) res.push({x:cur.x,y:cur.y,cost:cur.c});
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
       const nx=cur.x+dx, ny=cur.y+dy;
       if(nx<0||ny<0||nx>=BG||ny>=BH_) return;
+      if(isBlocked(nx,ny)) return;      // 瓦礫は通れない
       const o=occupant(nx,ny);
-      if(o && o!==u) return; // 駒は通過不可
-      if(seen[key(nx,ny)]!==undefined) return;
-      seen[key(nx,ny)]=cur.d+1;
-      frontier.push({x:nx,y:ny,d:cur.d+1});
+      if(o && o!==u) return;            // 駒は通過不可
+      const nc=cur.c+moveCost(nx,ny);
+      if(nc>u.mov) return;
+      const prev=best[key(nx,ny)];
+      if(prev===undefined || nc<prev){ best[key(nx,ny)]=nc; open.push({x:nx,y:ny,c:nc}); }
     });
   }
   return res;
@@ -3595,7 +3823,7 @@ function castSpell(target){
     // 各敵へのダメージを先に確定（途中で敵が倒れても全員に飛ぶ）
     const hits=foes.map(f=>({
       enemy:f,
-      dmg:Math.max(1, sp.pow - Math.floor(f.def/2) + Math.floor(Math.random()*5-2))
+      dmg:applyTaken(Math.round(sp.pow*spellMulOf(caster)) - Math.floor(f.def/2) + Math.floor(Math.random()*5-2), f)
     }));
     // 順次発射。間隔を短めにして連続感を出す
     let i=0;
@@ -3642,7 +3870,7 @@ function castSpell(target){
         return;
       }
       const ally=allies[i++];
-      const amount=sp.pow + Math.floor(Math.random()*5-2);
+      const amount=Math.round(sp.pow*spellMulOf(caster)) + Math.floor(Math.random()*5-2);
       const before=ally.hp;
       ally.hp=Math.min(ally.maxhp, ally.hp+amount);
       spawnHitFx(ally, ally.hp-before, 'heal');
@@ -3657,7 +3885,7 @@ function castSpell(target){
   // === 単体回復 ===
   if(sp.type==='heal'){
     SFX.heal();
-    const heal=sp.pow + Math.floor(Math.random()*5-2);
+    const heal=Math.round(sp.pow*spellMulOf(caster)) + Math.floor(Math.random()*5-2);
     const before=target.hp;
     target.hp=Math.min(target.maxhp, target.hp+heal);
     spawnHitFx(target, target.hp-before, 'heal');
@@ -3705,7 +3933,8 @@ function castSpell(target){
     const isDragon = target.sprite==='dragon' || target.sprite==='blackDragon' || target.sprite==='goldenDragon';
     if(isDragon){ spPow=Math.round(spPow*sp.slayMult); slaySpellFlash=true; }
   }
-  const dmg=Math.max(1, spPow - Math.floor(target.def/2) + Math.floor(Math.random()*5-2));
+  spPow=Math.round(spPow*spellMulOf(caster));
+  const dmg=applyTaken(spPow - Math.floor(target.def/2) + Math.floor(Math.random()*5-2), target);
   elHint.textContent=`${caster.name} の${sp.name}！`;
   fireballFx(caster.x, caster.y, target.x, target.y, ()=>{
     target.hp-=dmg;
@@ -4076,7 +4305,7 @@ function healFx(gx,gy){
 }
 
 function damage(attacker,target){
-  let atk=attacker.atk;
+  let atk=effAtkOf(attacker);
   let slayFlash=false, critFlash=false, beastFlash=false;
   // ドラゴン特効
   if(attacker.slayMult && attacker.slayMult>1){
@@ -4091,7 +4320,7 @@ function damage(attacker,target){
   if(attacker.critRate && Math.random() < attacker.critRate){
     atk = Math.round(atk * 2.0); critFlash=true;
   }
-  const dmg=Math.max(1, atk - target.def + Math.floor(Math.random()*5-2));
+  const dmg=applyTaken(atk - target.def + Math.floor(Math.random()*5-2), target);
   target.hp-=dmg;
   spawnHitFx(target, dmg, 'dmg');
   SFX.attack();
@@ -4104,13 +4333,18 @@ function damage(attacker,target){
   }
   else if(slayFlash) msg=`${attacker.name} の竜断ち！ ${target.name} に ${dmg} ダメージ`;
   else if(beastFlash) msg=`${attacker.name} の狙い澄ました矢！ ${target.name} に ${dmg} ダメージ`;
+  // 地形が結果を左右したときは、その理由が分かるようにしておく
+  if(terrainOf(target).taken<1)      msg+='（石壁が受け止めた）';
+  else if(terrainOf(target).taken>1) msg+='（水に沈んで踏ん張れない）';
+  else if(terrainOf(attacker).atk<1) msg+='（水に足を取られた）';
   if(target.hp<=0){ target.hp=0; target.alive=false; msg+=` ── ${target.name} を倒した！`; setTimeout(()=>SFX.fall(), 200); }
   elHint.textContent=msg;
 
   // サムライの反撃：被攻撃者がサムライで生存中、counterRateで発動
-  if(target.alive && target.counterRate && Math.random()<target.counterRate && attacker.alive){
+  if(target.alive && target.counterRate && !terrainOf(target).noCounter &&
+     Math.random()<target.counterRate && attacker.alive){
     setTimeout(()=>{
-      const cdmg=Math.max(1, target.atk - attacker.def + Math.floor(Math.random()*5-2));
+      const cdmg=applyTaken(effAtkOf(target) - attacker.def + Math.floor(Math.random()*5-2), attacker);
       attacker.hp-=cdmg;
       spawnHitFx(attacker, cdmg, 'dmg');
       SFX.attack();
@@ -4211,7 +4445,12 @@ function handleCell(gx,gy){
     }
   }
   // 駒を選び直す
-  if(o && o.side==='ally'){ selectUnit(o); }
+  if(o && o.side==='ally'){ selectUnit(o); return; }
+  // 何も無いマスを触ったら、その地形が何なのかを教える
+  if(!o){
+    const t=terrainAt(gx,gy);
+    if(t!==TERRAIN.plain) elHint.textContent=`${t.name}：${t.desc}`;
+  }
 }
 
 /* ---- キーボードでの戦闘操作（PC向け） ----
@@ -4584,7 +4823,7 @@ function enemyPhase(){
         const inRange=allies.filter(a=>Math.abs(a.x-f.x)+Math.abs(a.y-f.y)<=f.spell.radius);
         if(inRange.length){
           const target=inRange[Math.floor(Math.random()*inRange.length)];
-          const dmg=Math.max(1, f.spell.pow - Math.floor(target.def/2) + Math.floor(Math.random()*5-2));
+          const dmg=applyTaken(Math.round(f.spell.pow*spellMulOf(f)) - Math.floor(target.def/2) + Math.floor(Math.random()*5-2), target);
           elHint.textContent=`${f.name} の${f.spell.name}！`;
           const fx = (f.spell.type==='breath') ? breathFx : fireballFx;
           if(f.spell.type==='breath') SFX.fire(); else SFX.fire();
@@ -4605,23 +4844,36 @@ function enemyPhase(){
       }
     }
 
-    // 通常行動：最寄りの味方に近づくか攻撃
-    let target=allies.reduce((a,b)=>
-      (Math.abs(a.x-f.x)+Math.abs(a.y-f.y)) <= (Math.abs(b.x-f.x)+Math.abs(b.y-f.y))?a:b);
+    // 通常行動：立ち位置と相手をまとめて選ぶ。
+    // 「最寄りへ最短で寄る」だけだと自分から水に踏み込んでしまうので、
+    // 行ける全てのマスについて、そこから何ができるかを見て決める。
     const reach=computeReachable(f);
-    if(Math.abs(target.x-f.x)+Math.abs(target.y-f.y)<=f.rng){
-      damage(f,target);
-    } else {
-      // ターゲットに最も近づけるマスへ
-      let best=null,bestD=1e9;
-      reach.forEach(c=>{
-        const d=Math.abs(c.x-target.x)+Math.abs(c.y-target.y);
-        if(d<bestD){bestD=d;best=c;}
+    const spots=[{x:f.x,y:f.y,cost:0}].concat(reach);
+    let plan=null;
+    spots.forEach(s=>{
+      const ter=terrainAt(s.x,s.y);
+      const myAtk=Math.max(1, Math.round(f.atk*ter.atk));
+      // 立ち位置そのものの善し悪し（石壁には寄り、水は避ける）
+      const place=(1-ter.taken)*140 + (ter.atk-1)*45 - (ter.cost-1)*4;
+      allies.forEach(a=>{
+        const d=Math.abs(a.x-s.x)+Math.abs(a.y-s.y);
+        let score;
+        if(d<=f.rng){
+          // 届くなら、通してやれるダメージが大きい相手を狙う。
+          // 水に沈んだ相手は傷が深くなるので、自然とそちらが選ばれる
+          const dmg=expectedHit(myAtk, a);
+          score = 1000 + dmg*4 + (dmg>=a.hp ? 600 : 0) + place;
+        }else{
+          // 届かないときは、まず詰めること。ここで地形を重く見ると
+          // 石壁に吸い寄せられて前に出なくなり、撃つ側だけが得をする
+          score = 200 - d*12 + place*0.25;
+        }
+        if(!plan || score>plan.score) plan={score, x:s.x, y:s.y, target:a, hit:d<=f.rng};
       });
-      if(best){ f.x=best.x; f.y=best.y; }
-      if(Math.abs(target.x-f.x)+Math.abs(target.y-f.y)<=f.rng){
-        damage(f,target);
-      }
+    });
+    if(plan){
+      f.x=plan.x; f.y=plan.y;
+      if(plan.hit) damage(f, plan.target);
     }
     drawBattle();
     checkBattleEnd();
