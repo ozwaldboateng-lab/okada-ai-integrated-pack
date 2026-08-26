@@ -2644,10 +2644,30 @@ document.getElementById('bRight').onclick=()=>turn(1);
 const BG=8, BH_=10;            // 戦闘グリッド 8x10
 const bCanvas=document.getElementById('battle');
 const bctx=bCanvas.getContext('2d');
+/* 盤面は 480x480 の座標系で描き、実際の画素数だけ端末に合わせて増やす。
+   内部480pxのまま拡大表示していたため、どの端末でも1.5〜2倍にぼやけていた。
+   座標系は変えないので、描画側のコードはそのまま使える。 */
+const BCW=bCanvas.width, BCH=bCanvas.height;
+let bScale=0;
+function fitBattleCanvas(){
+  const rect=bCanvas.getBoundingClientRect();
+  if(!rect.width) return false;                  // まだ表示されていない
+  const dpr=window.devicePixelRatio||1;
+  // 実際に表示される画素数に合わせる。描画量が膨らみすぎないよう上限を切る
+  const want=Math.max(1, Math.min(3, (rect.width*dpr)/BCW));
+  const s=Math.round(want*2)/2;                  // 0.5刻みに丸めて、細かい揺れで作り直さない
+  if(s===bScale) return false;
+  bScale=s;
+  bCanvas.width =Math.round(BCW*s);
+  bCanvas.height=Math.round(BCH*s);
+  bctx.setTransform(s,0,0,s,0,0);                // 以降は 480x480 の座標で描ける
+  return true;
+}
+
 // グリッド全体がキャンバスに収まるようタイルサイズを決め、中央寄せ
-const TILE=Math.floor(Math.min(bCanvas.width/BG, bCanvas.height/BH_));
-const BOFFX=Math.floor((bCanvas.width -TILE*BG )/2);
-const BOFFY=Math.floor((bCanvas.height-TILE*BH_)/2);
+const TILE=Math.floor(Math.min(BCW/BG, BCH/BH_));
+const BOFFX=Math.floor((BCW -TILE*BG )/2);
+const BOFFY=Math.floor((BCH-TILE*BH_)/2);
 
 /* ---------- 水彩トップビュー（斜め後ろ見下ろし） ---------- */
 /* 立体定義から導いた半透明ストロークでキャラを描く。
@@ -3428,6 +3448,7 @@ function startBattle(isBoss, midbossKey){
     elHead.textContent='― 霧の生き物が現れた！ ―';
     elHint.textContent='駒を選び、移動先か敵をタップ。道具・逃走も選べる。';
   }
+  fitBattleCanvas();
   drawBattle(); renderInfo();
 }
 
@@ -3524,11 +3545,11 @@ function drawTerrainTile(px,py,kind,rnd){
 }
 
 function drawBattle(){
-  bctx.clearRect(0,0,bCanvas.width,bCanvas.height);
+  bctx.clearRect(0,0,BCW,BCH);
   // 背景：霧がかった暗い下地
-  let bg=bctx.createLinearGradient(0,0,0,bCanvas.height);
+  let bg=bctx.createLinearGradient(0,0,0,BCH);
   bg.addColorStop(0,'#2b3138'); bg.addColorStop(0.5,'#343a40'); bg.addColorStop(1,'#272c31');
-  bctx.fillStyle=bg; bctx.fillRect(0,0,bCanvas.width,bCanvas.height);
+  bctx.fillStyle=bg; bctx.fillRect(0,0,BCW,BCH);
 
   // 被弾直後だけ盤面をわずかに揺らす（背景は動かさないので端に隙間が出ない）
   const shakeSrc=hitEffects.find(h=>h.frame<3 && h.kind!=='heal');
@@ -3566,11 +3587,11 @@ function drawBattle(){
     }
   }
   // 床全体に霧のビネット
-  let mist=bctx.createRadialGradient(bCanvas.width/2,bCanvas.height*0.42,TILE*2,
-                                     bCanvas.width/2,bCanvas.height*0.5,bCanvas.height*0.8);
+  let mist=bctx.createRadialGradient(BCW/2,BCH*0.42,TILE*2,
+                                     BCW/2,BCH*0.5,BCH*0.8);
   mist.addColorStop(0,'rgba(200,206,202,0)');
   mist.addColorStop(1,'rgba(150,160,162,.28)');
-  bctx.fillStyle=mist; bctx.fillRect(0,0,bCanvas.width,bCanvas.height);
+  bctx.fillStyle=mist; bctx.fillRect(0,0,BCW,BCH);
 
   // 地形は霧のあとに重ねる。先に描くと白く飛んで、瓦礫が透明な板に見える
   for(let y=0;y<BH_;y++){
@@ -4369,7 +4390,7 @@ function endUnitTurn(){
 bCanvas.addEventListener('click',e=>{
   if(phase!=='player') return;
   const rect=bCanvas.getBoundingClientRect();
-  const scaleX=bCanvas.width/rect.width, scaleY=bCanvas.height/rect.height;
+  const scaleX=BCW/rect.width, scaleY=BCH/rect.height;
   const mx=(e.clientX-rect.left)*scaleX;
   const my=(e.clientY-rect.top)*scaleY;
   const gx=Math.floor((mx-BOFFX)/TILE);
@@ -5913,8 +5934,12 @@ function updateLandscape(){
   document.body.classList.toggle('desktop',   wide && !short && w >= 1000);
 }
 updateLandscape();
-window.addEventListener('resize', updateLandscape);
-window.addEventListener('orientationchange', ()=>{ setTimeout(updateLandscape, 100); });
+// 画面の大きさが変わると盤面の表示寸法も変わるので、解像度を取り直す
+function refitBattle(){
+  if(isViewOpen(elBattleView) && fitBattleCanvas()) drawBattle();
+}
+window.addEventListener('resize', ()=>{ updateLandscape(); refitBattle(); });
+window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateLandscape(); refitBattle(); }, 100); });
 
 // タイトル画面が最初に表示される（exploreView は display:none で開始）
 </script>
