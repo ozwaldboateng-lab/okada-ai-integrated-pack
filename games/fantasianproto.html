@@ -539,6 +539,11 @@
   }
   .battle-actions button:active{transform:translateY(2px);box-shadow:0 0 0 #6d5433;}
   .battle-actions button:disabled{opacity:.4;cursor:default;}
+  /* オートが入っている間は、押されたままに見せる */
+  .battle-actions button.on{
+    background:linear-gradient(180deg,#5a4526,#3a2b16);
+    border-color:#c9a253; color:#f6ecd6;
+  }
   #bSpell{
     background:linear-gradient(180deg,#3a2f45,#251d2e);border-color:#6b5a80;
     box-shadow:0 2px 0 #a692b5, inset 0 1px 0 rgba(255,255,255,.5);
@@ -984,7 +989,8 @@
         <tr><td>魔法</td><td>撃つたびに<b>魔力</b>を消費する。宿屋で眠るか、魔力の雫で戻る</td></tr>
         <tr><td>道具</td><td>選んだ駒の行動を使って、傷薬などを使う</td></tr>
         <tr><td>逃げる</td><td>通常の戦いなら七割で成功。番人と古竜からは逃げられない</td></tr>
-        <tr><td>PC操作</td><td>矢印でカーソル移動／Enter で決定／Tab で味方切替／q・e・r＝待機・行動終了・魔法</td></tr>
+        <tr><td>オート</td><td>味方の行動を自動で選ぶ。回復を優先し、魔法は要所で使う。<b>仲間が倒れると自動で解除</b>される</td></tr>
+        <tr><td>PC操作</td><td>矢印でカーソル移動／Enter で決定／Tab で味方切替／q・e・r・a＝待機・行動終了・魔法・オート</td></tr>
       </table>
 
       <h3>町</h3>
@@ -1050,6 +1056,7 @@
       <button id="bSpell" style="display:none">魔法</button>
       <button id="bBattleItem">道具</button>
       <button id="bFlee">逃げる</button>
+      <button id="bAuto">オート</button>
       <button id="bEndUnit" disabled>行動終了</button>
     </div>
     <div class="battle-info" id="battleInfo"></div>
@@ -3414,6 +3421,8 @@ function startBattle(isBoss, midbossKey){
     elHint.textContent='駒を選び、移動先か敵をタップ。道具・逃走も選べる。';
   }
   fitBattleCanvas();
+  autoActing=null; autoAliveSeen=-1;
+  if(typeof setAuto==='function') setAuto(autoBattle);
   drawBattle(); renderInfo();
 }
 
@@ -3625,6 +3634,31 @@ function computeReachable(u){
     });
   }
   return res;
+}
+
+/* 行ける全てのマスについて「そこから何ができるか」を見て、
+   立ち位置と殴る相手を同時に決める。
+   「最寄りへ最短で寄る」だけだと、移動して同じターンに攻撃できる形を
+   取り逃がすので、候補を総当たりする。盤が8x10なので十分軽い。 */
+function combatPlan(u, foes){
+  if(!foes.length) return null;
+  const spots=[{x:u.x,y:u.y}].concat(computeReachable(u));
+  let plan=null;
+  spots.forEach(s=>{
+    foes.forEach(t=>{
+      const d=Math.abs(t.x-s.x)+Math.abs(t.y-s.y);
+      let score;
+      if(d<=u.rng){
+        // 届くなら、通してやれるダメージが大きい相手を狙う
+        const dmg=Math.max(1, u.atk - t.def);
+        score = 1000 + dmg*4 + (dmg>=t.hp ? 600 : 0);
+      }else{
+        score = 200 - d*12;      // 届かないなら、まず詰める
+      }
+      if(!plan || score>plan.score) plan={score, x:s.x, y:s.y, target:t, hit:d<=u.rng};
+    });
+  });
+  return plan;
 }
 
 function computeAttackable(u){
@@ -4277,6 +4311,125 @@ function endUnitTurn(){
   }
 }
 
+
+/* ===== オート戦闘 =====
+   味方の行動を自動で選ぶ。判断は敵AIと同じ combatPlan を土台に、
+   魔法の使いどころ（回復の閾値・魔力の温存）だけ味方向けに足してある。
+   ゲーム側の関数（selectUnit / handleCell / castSpell）をそのまま通すので、
+   演出も戦闘後の処理も手動のときと同じ経路を辿る。 */
+let autoBattle=false;
+let autoActing=null, autoSince=0, autoAliveSeen=-1;
+const elAuto=document.getElementById('bAuto');
+
+function setAuto(on, msg){
+  autoBattle=!!on;
+  autoActing=null;
+  if(elAuto){
+    elAuto.textContent = autoBattle ? 'オート中' : 'オート';
+    elAuto.classList.toggle('on', autoBattle);
+  }
+  if(msg) elHint.textContent=msg;
+}
+
+// 使う魔法を決める。無ければ null（＝物理で戦う）
+function autoSpellPlan(u){
+  const spells=u.spells||[];
+  const allies=units.filter(t=>t.side==='ally'&&t.alive);
+  const foes=units.filter(t=>t.side==='foe'&&t.alive);
+  const inRange=(t,r)=>Math.abs(t.x-u.x)+Math.abs(t.y-u.y)<=r;
+
+  // ① 回復が最優先。倒れてからでは遅い
+  for(let i=0;i<spells.length;i++){
+    const sp=spells[i];
+    if(!canAfford(u,sp)) continue;
+    if(sp.type==='heal_full' || sp.type==='heal_all'){
+      if(allies.filter(a=>a.hp<a.maxhp*0.55).length>=2) return {idx:i, target:null};
+    }
+    if(sp.type==='heal'){
+      const hurt=allies.filter(a=>a.hp<a.maxhp*0.5 && inRange(a,sp.radius));
+      if(hurt.length){
+        hurt.sort((a,b)=>a.hp/a.maxhp - b.hp/b.maxhp);
+        return {idx:i, target:hurt[0]};
+      }
+    }
+  }
+  // ② 攻撃魔法は、とどめか、まとめて当たるか、殴るより明らかに通るときだけ。
+  //    雑魚に撃ち尽くすと肝心なところで魔力が残らない
+  for(let i=0;i<spells.length;i++){
+    const sp=spells[i];
+    if(!canAfford(u,sp)) continue;
+    if(sp.type==='damage_all'){
+      if(foes.length>=2) return {idx:i, target:null};
+    }
+    if(sp.type==='damage'){
+      const inR=foes.filter(f=>inRange(f,sp.radius));
+      if(!inR.length) continue;
+      const magic=f=>Math.max(1, sp.pow - Math.floor(f.def/2));
+      const phys =f=>Math.max(1, u.atk - f.def);
+      const kill=inR.find(f=>magic(f)>=f.hp);
+      if(kill) return {idx:i, target:kill};
+      const best=inR.reduce((a,b)=>magic(a)>=magic(b)?a:b);
+      if(magic(best) >= phys(best)*2) return {idx:i, target:best};
+    }
+  }
+  return null;
+}
+
+function autoStep(u){
+  selectUnit(u);
+  if(selected!==u){ u.acted=true; return; }   // 選べない状態なら手番を飛ばす
+
+  const sp=autoSpellPlan(u);
+  if(sp){ spellChoiceIdx=sp.idx; castSpell(sp.target); return; }
+
+  const foes=units.filter(t=>t.side==='foe'&&t.alive);
+  const plan=combatPlan(u, foes);
+  if(!plan){ endUnitTurn(); return; }
+  if(plan.x!==u.x || plan.y!==u.y) handleCell(plan.x, plan.y);
+
+  // 移動だけで手番が終わる場合もあるので、続きは状態を見てから
+  setTimeout(()=>{
+    if(!autoBattle || phase!=='player') return;
+    if(selected!==u || !u.alive) return;
+    const foe=attackable.find(t=>t===plan.target) || attackable[0];
+    if(foe) handleCell(foe.x, foe.y);
+    else endUnitTurn();
+  }, 260);
+}
+
+function autoTick(){
+  if(!autoBattle || phase!=='player') return;
+  if(!elBattleView || !isViewOpen(elBattleView)) return;
+  // ダイアログが開いている間は手を出さない
+  if(getComputedStyle(elConfirm).display!=='none') return;
+  if(elSpellChoiceDialog && getComputedStyle(elSpellChoiceDialog).display!=='none') return;
+
+  // 仲間が倒れたら操作を返す。自動のまま全滅させない
+  const alive=units.filter(u=>u.side==='ally'&&u.alive).length;
+  if(autoAliveSeen>=0 && alive<autoAliveSeen){
+    autoAliveSeen=alive;
+    setAuto(false, '仲間が倒れた。オートを解除する。');
+    drawBattle();
+    return;
+  }
+  autoAliveSeen=alive;
+
+  // 直前の行動がまだ終わっていない（演出中）。長引いたときは打ち切る
+  if(autoActing && autoActing.alive && !autoActing.acted && performance.now()-autoSince<4000) return;
+
+  const u=units.find(x=>x.side==='ally'&&x.alive&&!x.acted);
+  if(!u) return;                 // 全員行動済み。敵フェイズへは既存の流れが進める
+  autoActing=u; autoSince=performance.now();
+  autoStep(u);
+}
+setInterval(autoTick, 220);
+
+if(elAuto) elAuto.onclick=()=>{
+  setAuto(!autoBattle, autoBattle ? 'オートを解除した。' : 'オートで戦う。もう一度押すと解除。');
+  if(autoBattle) clearSelection();
+  drawBattle();
+};
+
 bCanvas.addEventListener('click',e=>{
   if(phase!=='player') return;
   const rect=bCanvas.getBoundingClientRect();
@@ -4407,6 +4560,7 @@ window.addEventListener('keydown',e=>{
       e.preventDefault(); break;
     case 'q': elWait.click(); e.preventDefault(); break;
     case 'e': elEndUnit.click(); e.preventDefault(); break;
+    case 'a': if(elAuto) elAuto.click(); e.preventDefault(); break;
     case 'r': if(elSpell.style.display!=='none') elSpell.click(); e.preventDefault(); break;
   }
 });
@@ -4755,26 +4909,8 @@ function enemyPhase(){
       }
     }
 
-    // 通常行動：立ち位置と相手をまとめて選ぶ。
-    // 「最寄りへ最短で寄る」だけだと自分から水に踏み込んでしまうので、
-    // 行ける全てのマスについて、そこから何ができるかを見て決める。
-    const reach=computeReachable(f);
-    const spots=[{x:f.x,y:f.y,cost:0}].concat(reach);
-    let plan=null;
-    spots.forEach(s=>{
-      allies.forEach(a=>{
-        const d=Math.abs(a.x-s.x)+Math.abs(a.y-s.y);
-        let score;
-        if(d<=f.rng){
-          // 届くなら、通してやれるダメージが大きい相手を狙う
-          const dmg=Math.max(1, f.atk - a.def);
-          score = 1000 + dmg*4 + (dmg>=a.hp ? 600 : 0);
-        }else{
-          score = 200 - d*12;      // 届かないなら、まず詰める
-        }
-        if(!plan || score>plan.score) plan={score, x:s.x, y:s.y, target:a, hit:d<=f.rng};
-      });
-    });
+    // 通常行動：立ち位置と相手をまとめて選ぶ
+    const plan=combatPlan(f, allies);
     if(plan){
       f.x=plan.x; f.y=plan.y;
       if(plan.hit) damage(f, plan.target);
