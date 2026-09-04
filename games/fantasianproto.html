@@ -974,7 +974,8 @@
 
       <h3>探索</h3>
       <p>迷宮では前進・後退と左右の方向転換で歩く。歩いていると霧の生き物に出くわす。<br>
-         地図は歩いた場所だけが記される。<b>階段</b>で階層を移動し、B1 の上り階段から町へ戻れる。</p>
+         地図は歩いた場所だけが記される。<b>階段</b>で階層を移動し、B1 の上り階段から町へ戻れる。<br>
+         道中の<b>宝箱</b>は踏めば開く。最下層には<b>石版</b>があり、踏むと刻まれた文が読める。</p>
       <table class="help-keys">
         <tr><td>PC</td><td>↑↓←→ または W A S D</td></tr>
         <tr><td>スマホ</td><td>画面下の方向ボタン</td></tr>
@@ -1458,17 +1459,17 @@ const FLOOR_SRC=[
   // B6：最深部、最奥に魔法陣（古竜）
   [
     "##############",
-    "#<...#.......#",
+    "#<.!.#.......#",
     "#.##.#.#####.#",
     "#.#..#.....#.#",
     "#.#.######.#.#",
     "#.#......#.#.#",
     "#.######.#.#.#",
-    "#......#...#.#",
+    "#...!..#...#.#",
     "######.#####.#",
     "#......#.....#",
     "#.######.###.#",
-    "#*........$#$#",
+    "#*.!......$#$#",
     "##############",
   ],
 ];
@@ -1478,6 +1479,7 @@ function buildFloor(src){
   const grid=[]; let stairsDown=null, stairsUp=null, altar=null;
   const chests=[];  // この床の宝箱の位置
   const warps=[];   // この床にあるワープ位置（{x,y}の配列）。飛び先はFLOOR_WARP_LINKSで指定
+  const tablets=[];  // この床の石版。文面は FLOOR_TABLETS[階][並び順] で対応させる
   src.forEach((row,y)=>{
     const line=[];
     for(let x=0;x<row.length;x++){
@@ -1489,11 +1491,12 @@ function buildFloor(src){
         else if(c==='*') altar={x,y};
         else if(c==='~') warps.push({x,y});
         else if(c==='$'){ chests.push({x,y}); }
+        else if(c==='!'){ tablets.push({x,y}); }
       }
     }
     grid.push(line);
   });
-  return {chests, opened:chests.map(()=>false), grid, stairsDown, stairsUp, altar, warps,
+  return {chests, opened:chests.map(()=>false), tablets, grid, stairsDown, stairsUp, altar, warps,
           visited: grid.map(row=>row.map(()=>false))};
 }
 const FLOORS=FLOOR_SRC.map(buildFloor);
@@ -1547,6 +1550,8 @@ function drawMinimap(){
         mmctx.fillStyle='#5d8aa8'; mmctx.fillRect(px+1,py+1,cell-2,cell-2);
       }else if(f.altar && f.altar.x===x && f.altar.y===y){
         mmctx.fillStyle='#a8443a'; mmctx.fillRect(px+1,py+1,cell-2,cell-2);
+      }else if(f.tablets && f.tablets.some(t=>t.x===x&&t.y===y)){
+        mmctx.fillStyle='#d5d8cf'; mmctx.fillRect(px+1,py+1,cell-2,cell-2);
       }else if(f.warps && f.warps.some(w=>w.x===x&&w.y===y)){
         mmctx.fillStyle='#9a6ec0'; mmctx.fillRect(px+1,py+1,cell-2,cell-2);
       }
@@ -1826,6 +1831,29 @@ function ownedItemKeys(){
 }
 
 // キーアイテム：装備ではなく、雇用条件などに使う特殊なアイテム
+/* 石版。地図に '!' を置いた順（上の行から、同じ行なら左から）に対応する。
+   周回してもう一度潜る必要があることを、少しずつ明かしていく。
+   after を書いた石版は、二周目以降だけ文面が変わる。 */
+const FLOOR_TABLETS={
+  5: [
+    {text:'石版に、無数の名が刻まれている。いずれも竜を斃した者たちのものだ。'
+        +'──ならば、なぜ竜はまだここにいる。'},
+    {text:'「竜は黄昏ではない。黄昏の器だ。器を砕いたところで、'
+        +'霧は次の器を見つけるだけだ」'},
+    {text:'「討ち果たしても、聖域は閉じない。竜を斃した者は、町を出て、'
+        +'もう一度ここへ降りることになる。次に待つ影は、いまより深い」',
+     after:'「よく戻った。霧はおまえの名も、いずれこの石に刻むだろう」'},
+  ],
+};
+
+function readTablet(fi, idx){
+  const list=FLOOR_TABLETS[fi];
+  const t=list && list[idx];
+  if(!t){ elExploreLog.textContent='文字は削れて、もう読めない。'; return; }
+  SFX.dialog();
+  elExploreLog.textContent = (loop>=2 && t.after) ? t.after : t.text;
+}
+
 const KEY_ITEMS={
   key_scroll: {name:'忍びの結び文', desc:'古い和紙に綴られた、一族への伝言。'},
   key_blade:  {name:'折れた刀',   desc:'刃が半ばで断たれた、誰かの形見。'},
@@ -2526,15 +2554,22 @@ function move(forward){
   drawDungeon(); refreshHud();
 
   const f=FLOORS[floorIndex];
+  // 宝箱：踏んだら開ける。一度開けたら空になる。
+  // （以前はワープ判定の内側に入っていて、ワープを置いた階が無いため一度も開かなかった）
+  const ci=f.chests ? f.chests.findIndex(c=>c.x===player.x && c.y===player.y) : -1;
+  if(ci>=0 && !f.opened[ci]){
+    f.opened[ci]=true;
+    openChest();
+    return;
+  }
+  // 石版：踏むと刻まれた文が読める。読んでいる間は敵が出ない
+  const ti=f.tablets ? f.tablets.findIndex(t=>t.x===player.x && t.y===player.y) : -1;
+  if(ti>=0){
+    readTablet(floorIndex, ti);
+    return;
+  }
   // ワープゾーン
   if(f.warps && f.warps.some(w=>w.x===player.x && w.y===player.y)){
-    // 宝箱：踏んだら開ける。一度開けたら空になる
-    const ci=f.chests ? f.chests.findIndex(c=>c.x===player.x && c.y===player.y) : -1;
-    if(ci>=0 && !f.opened[ci]){
-      f.opened[ci]=true;
-      openChest();
-      return;
-    }
     const linkKey=`${floorIndex}:${player.x},${player.y}`;
     const link=WARP_LINKS[linkKey];
     if(link){
