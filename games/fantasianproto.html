@@ -2986,6 +2986,12 @@ function loadSpriteImages(){
    盤の上に余白が無いので頭と翼が画面の外へ出てしまう。
    ボスだけ低い係数を使い、絵がマスを跨ぐように置く。 */
 const BIG_BOSS_SPRITES=new Set(['dragon','blackDragon','goldenDragon']);
+/* 巨躯のボスは1枚絵なので、コマ割りの動きは持てない。
+   代わりに、ゆっくりした呼吸（縦のわずかな伸縮）と、
+   半分を割ってからの怒りの輝きで「生き物」に見せる。 */
+let bossAnimT=0;      // 呼吸の位相（秒）
+let bossRage=false;   // HPが半分を割ったか
+let bossShake=0;      // 咆哮の揺れ（残りフレーム）
 const BOSS_DRAW_SCALE=5.25;   // 元画像は518px。252pxで描いてもまだ元の解像度に収まる
 const FOOT_NORMAL=0.96, FOOT_BOSS=0.62;
 
@@ -2999,6 +3005,21 @@ function drawSprite(ctx, name, dx, dy, size, scale){
     let drawSize=size*1.2;       // 通常キャラの描画倍率
     if(boss) drawSize=size*BOSS_DRAW_SCALE;
     else if(scale && scale>1.2) drawSize=size*scale*1.2;
+    if(boss){
+      // 怒りの輝き。絵そのものには触れず、背後に置くだけ
+      if(bossRage){
+        const gr=0.5+0.5*Math.sin(bossAnimT*3.4);
+        const rad=drawSize*0.46;
+        const g2=ctx.createRadialGradient(cx,dy+size-drawSize*0.34,rad*0.15,cx,dy+size-drawSize*0.34,rad);
+        g2.addColorStop(0,`rgba(214,74,40,${0.20+gr*0.16})`);
+        g2.addColorStop(0.6,`rgba(150,36,20,${0.10+gr*0.08})`);
+        g2.addColorStop(1,'rgba(120,24,12,0)');
+        ctx.fillStyle=g2;
+        ctx.fillRect(cx-rad, dy+size-drawSize*0.34-rad, rad*2, rad*2);
+      }
+      // 呼吸。息を吸うと縦にわずかに伸びる
+      drawSize *= 1 + Math.sin(bossAnimT*1.9)*(bossRage?0.028:0.018);
+    }
     // 中央寄せ、下端を足元に合わせる
     const drawX=cx-drawSize/2;
     const drawY=dy+size - drawSize*(boss?FOOT_BOSS:FOOT_NORMAL);
@@ -3467,6 +3488,7 @@ function startBattle(isBoss, midbossKey){
   }
   fitBattleCanvas();
   autoActing=null; autoAliveSeen=-1;
+  bossAnimT=0; bossRage=false; bossShake=0;
   if(typeof setAuto==='function') setAuto(autoBattle);
   drawBattle(); renderInfo();
 }
@@ -3512,6 +3534,7 @@ function drawBattle(){
   const shakeSrc=hitEffects.find(h=>h.frame<3 && h.kind!=='heal');
   bctx.save();
   if(shakeSrc) bctx.translate((shakeSrc.frame%2?-1:1)*TILE*0.06, 0);
+  else if(bossShake>0){ bctx.translate((bossShake%2?-1:1)*TILE*0.10, 0); bossShake--; }
 
   // 床（水彩タッチの石床：石灰色と霧青緑の中間色）
   const stoneA=['#6e756c','#72776a','#697066','#737869'];
@@ -3640,6 +3663,15 @@ function drawBattle(){
       bctx.fillRect(bx,by,bw*Math.max(0,u.hp)/u.maxhp,2);
     }
   });
+
+  /* HPが半分を割ったら一度だけ咆哮させる。
+     数値の変化だけでは長い戦いに起伏がないので、区切りを目で分かるようにする。 */
+  const bossNow=units.find(u=>u.alive && BIG_BOSS_SPRITES.has(u.sprite));
+  if(bossNow && !bossRage && bossNow.hp<=bossNow.maxhp*0.5){
+    bossRage=true; bossShake=10;
+    elHead.textContent=`― ${bossNow.name}が咆哮を上げた ―`;
+    SFX.fire();
+  }
 
   /* 巨躯のボスの背後や真横に回った駒は、絵の下に完全に隠れてしまう。
      奥行きとしては正しい重なりだが、自分の駒が見えないのは操作の妨げになるので、
@@ -3974,7 +4006,7 @@ function castSpell(target){
 function spellFx(gx,gy){
   const px=BOFFX+gx*TILE, py=BOFFY+gy*TILE, cx=px+TILE/2, cy=py+TILE/2;
   let frame=0;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     const r=TILE*(0.2+frame*0.12);
     bctx.save();
@@ -3985,18 +4017,25 @@ function spellFx(gx,gy){
     bctx.beginPath();bctx.arc(cx,cy,r,0,Math.PI*2);bctx.fill();
     bctx.restore();
     frame++;
-    if(frame>5){ clearInterval(iv); drawBattle(); }
+    if(frame>5){ fxClearInterval(iv); drawBattle(); }
   },45);
 }
 
 // 火炎の吐息：caster(gx0,gy0) → target(gx1,gy1) に向けて、扇状の炎が噴き出す
 // onImpact: 着弾時に呼ばれる、onEnd: エフェクト終了時に呼ばれる
+/* 演出が動いている間は、ボスの呼吸で盤を描き直さないための目印。
+   各 FX は「drawBattle してから効果を上に重ねる」作りなので、
+   その合間に割り込むと効果が1コマおきに消えて点滅する。 */
+const fxActive=new Set();
+function fxSetInterval(fn, ms){ const iv=setInterval(fn, ms); fxActive.add(iv); return iv; }
+function fxClearInterval(iv){ if(fxActive.delete(iv)) clearInterval(iv); }
+
 function breathFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
   // ドラゴンは大きいので口の位置を顔の高さに合わせる：上半身寄りの位置
   const x0=BOFFX+gx0*TILE+TILE/2;
   const y0=BOFFY+gy0*TILE-TILE*0.6;  // タイルの上、口元あたり
   const x1=BOFFX+gx1*TILE+TILE/2, y1=BOFFY+gy1*TILE+TILE/2;
-  const buildupFrames=4;   // 口元に光が集まる
+  const buildupFrames=9;   // 口元に光が集まる。着弾点を先に示して「来る」と分かるようにする
   const breathFrames=10;   // 噴き出して伸びる
   const burnFrames=8;      // 着弾して滞留・焼く
   const totalFrames=buildupFrames+breathFrames+burnFrames;
@@ -4007,7 +4046,7 @@ function breathFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
   const px=-ny, py=nx; // 垂直方向（扇の広がり）
   let frame=0;
   let impacted=false;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     bctx.save();
     if(frame<buildupFrames){
@@ -4021,6 +4060,14 @@ function breathFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
       g.addColorStop(1,'rgba(180,28,28,0)');
       bctx.fillStyle=g;
       bctx.beginPath(); bctx.arc(x0,y0,r,0,Math.PI*2); bctx.fill();
+      // 着弾点を先に示す。撃たれてから気づくのではなく、来ると分かるように
+      const mr=TILE*(0.30+0.16*Math.sin(t*Math.PI*3));
+      bctx.strokeStyle=`rgba(255,150,60,${0.35+t*0.5})`;
+      bctx.lineWidth=Math.max(2, TILE*0.06);
+      bctx.beginPath(); bctx.arc(x1,y1,mr,0,Math.PI*2); bctx.stroke();
+      bctx.strokeStyle=`rgba(255,226,150,${0.2+t*0.35})`;
+      bctx.lineWidth=1;
+      bctx.beginPath(); bctx.arc(x1,y1,mr*0.62,0,Math.PI*2); bctx.stroke();
     }else if(frame<buildupFrames+breathFrames){
       // 噴き出し：扇状の炎を、口元から対象までだんだん伸ばす
       const t=(frame-buildupFrames)/breathFrames;          // 0..1
@@ -4083,7 +4130,7 @@ function breathFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
     bctx.restore();
     frame++;
     if(frame>=totalFrames){
-      clearInterval(iv);
+      fxClearInterval(iv);
       drawBattle();
       if(onEnd) onEnd();
     }
@@ -4098,7 +4145,7 @@ function aoeFireFx(gx0, gy0, gcx, gcy, area, cells, onImpact, onEnd){
   const trail=[];
   let frame=0;
   let impacted=false;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     bctx.save();
     if(frame<flightFrames){
@@ -4155,7 +4202,7 @@ function aoeFireFx(gx0, gy0, gcx, gcy, area, cells, onImpact, onEnd){
     bctx.restore();
     frame++;
     if(frame>=flightFrames+burstFrames){
-      clearInterval(iv);
+      fxClearInterval(iv);
       drawBattle();
       if(onEnd) onEnd();
     }
@@ -4167,7 +4214,7 @@ function aoeHealFx(gcx, gcy, area, cells){
   const xc=BOFFX+gcx*TILE+TILE/2, yc=BOFFY+gcy*TILE+TILE/2;
   const totalFrames=10;
   let frame=0;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     bctx.save();
     const t=frame/totalFrames;
@@ -4202,7 +4249,7 @@ function aoeHealFx(gcx, gcy, area, cells){
     });
     bctx.restore();
     frame++;
-    if(frame>=totalFrames){ clearInterval(iv); drawBattle(); }
+    if(frame>=totalFrames){ fxClearInterval(iv); drawBattle(); }
   },45);
 }
 
@@ -4217,7 +4264,7 @@ function fireballFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
   const trail=[];           // 残像位置の履歴
   let frame=0;
   let impacted=false;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     bctx.save();
     if(frame<flightFrames){
@@ -4286,7 +4333,7 @@ function fireballFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
     bctx.restore();
     frame++;
     if(frame>=flightFrames+explodeFrames){
-      clearInterval(iv);
+      fxClearInterval(iv);
       drawBattle();
       if(onEnd) onEnd();
     }
@@ -4297,7 +4344,7 @@ function fireballFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
 function healFx(gx,gy){
   const px=BOFFX+gx*TILE, py=BOFFY+gy*TILE, cx=px+TILE/2, cy=py+TILE/2;
   let frame=0;
-  const iv=setInterval(()=>{
+  const iv=fxSetInterval(()=>{
     drawBattle();
     bctx.save();
     const a=Math.max(0,0.65-frame*0.1);
@@ -4319,7 +4366,7 @@ function healFx(gx,gy){
     }
     bctx.restore();
     frame++;
-    if(frame>6){ clearInterval(iv); drawBattle(); }
+    if(frame>6){ fxClearInterval(iv); drawBattle(); }
   },45);
 }
 
@@ -4492,6 +4539,30 @@ function autoTick(){
   autoStep(u);
 }
 setInterval(autoTick, 220);
+
+/* ボスの呼吸を進めるループ。
+   FX の各関数は「drawBattle してから効果を上に描く」作りなので、
+   その最中に割り込むと効果が1コマ消えて点滅する。
+   自分のターンで盤を眺めている間だけ回せば、その心配がない。 */
+(function bossBreath(){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last=performance.now(), acc=0;
+  const STEP=1/30;   // 呼吸はゆっくりなので30コマ/秒で足りる。無駄に描かない
+  function tick(now){
+    const dt=Math.min(0.1,(now-last)/1000); last=now; acc+=dt;
+    if(acc<STEP){ requestAnimationFrame(tick); return; }
+    acc=0;
+    if(!reduce && phase==='player' && elBattleView && isViewOpen(elBattleView)
+       && fxActive.size===0                      // 演出中は触らない
+       && units.some(u=>u.alive && BIG_BOSS_SPRITES.has(u.sprite))
+       && getComputedStyle(elConfirm).display==='none'){
+      bossAnimT+=STEP;
+      drawBattle();
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
 
 if(elAuto) elAuto.onclick=()=>{
   setAuto(!autoBattle, autoBattle ? 'オートを解除した。' : 'オートで戦う。もう一度押すと解除。');
