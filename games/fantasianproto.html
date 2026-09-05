@@ -3488,7 +3488,7 @@ function startBattle(isBoss, midbossKey){
   }
   fitBattleCanvas();
   autoActing=null; autoAliveSeen=-1;
-  bossAnimT=0; bossRage=false; bossShake=0;
+  bossAnimT=0; bossRage=false; bossShake=0; bossDying=false; battleResolved=false;
   if(typeof setAuto==='function') setAuto(autoBattle);
   drawBattle(); renderInfo();
 }
@@ -5063,15 +5063,119 @@ function enemyPhase(){
   setTimeout(step,420);
 }
 
+/* ===== ボスの消滅 =====
+   倒した瞬間に結果パネルを出すと、竜は「消えた」のではなく
+   「描かれなくなった」だけに見える。まず音楽を落として沈黙を作り、
+   盤だけを残してゆっくり崩れさせてから結果へ移る。 */
+let bossDying=false;
+
+function bossDeathFx(boss, onDone){
+  const img=SPRITE_IMG_OBJ[boss.sprite];
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  BGM.stop(0.9);                    // 沈黙がいちばん効く。まず音楽を落とす
+  if(!img || reduce){ setTimeout(()=>onDone&&onDone(), reduce?500:0); return; }
+
+  SFX.fall();
+  noise({dur:1.6, vol:0.16, hpf:60, lpf:900});                       // 崩れる唸り
+  tone({f:150, f2:42, dur:1.9, type:'sawtooth', vol:0.13, attack:0.06}); // ゆっくり沈む持続音
+
+  const size=TILE*BOSS_DRAW_SCALE;
+  const cx=BOFFX+boss.x*TILE+TILE/2;
+  const baseY=BOFFY+boss.y*TILE+TILE-size*FOOT_BOSS;
+  const rnd=mulberry32(0x5eed ^ (boss.x*31+boss.y));
+  // 砕けた粒。絵の範囲にばらまいて上へ流す
+  const motes=[];
+  for(let i=0;i<46;i++){
+    motes.push({ x:cx+(rnd()-0.5)*size*0.72,
+                 y:baseY+size*(0.18+rnd()*0.62),
+                 vy:-(18+rnd()*46), vx:(rnd()-0.5)*22,
+                 r:1.2+rnd()*2.6, t0:rnd()*0.35 });
+  }
+  const FLASH=320, FADE=1250, HOLD=650;   // 白熱 / 褪せて散る / 盤だけの静けさ
+  const total=FLASH+FADE+HOLD;
+  const t0=performance.now();
+  bossShake=8;
+
+  const iv=fxSetInterval(()=>{
+    const el=Math.min(total, performance.now()-t0);
+    drawBattle();                   // 竜はもう alive=false なので盤には出ない
+    bctx.save();
+    if(el<FLASH){
+      // とどめの白熱。まだ形は保っている
+      const t=el/FLASH;
+      bctx.drawImage(img, cx-size/2, baseY, size, size);
+      bctx.globalCompositeOperation='lighter';
+      bctx.globalAlpha=0.30+0.5*Math.sin(t*Math.PI);
+      bctx.drawImage(img, cx-size/2, baseY, size, size);
+    }else if(el<FLASH+FADE){
+      // 浮き上がりながら褪せ、光に散る
+      const t=(el-FLASH)/FADE;
+      const w=size*(1+t*0.10);
+      const x=cx-w/2, y=baseY-size*0.16*t-(w-size)/2;
+      bctx.globalAlpha=Math.max(0, 1-t*1.05);
+      bctx.drawImage(img, x, y, w, w);
+      bctx.globalCompositeOperation='lighter';
+      bctx.globalAlpha=Math.max(0, 0.55*(1-t)*(1-t));
+      bctx.drawImage(img, x, y, w, w);
+    }
+    bctx.restore();
+
+    // 粒は絵が消えたあともしばらく漂う
+    if(el>=FLASH*0.5){
+      const st=(el-FLASH*0.5)/1000;
+      bctx.save();
+      bctx.globalCompositeOperation='lighter';
+      motes.forEach(m=>{
+        const mt=st-m.t0;
+        if(mt<=0) return;
+        const a=Math.max(0, 1-mt/1.5);
+        if(a<=0) return;
+        const x=m.x+m.vx*mt+Math.sin(mt*3+m.t0*9)*5;
+        const y=m.y+m.vy*mt;
+        const g=bctx.createRadialGradient(x,y,0,x,y,m.r*3.2);
+        g.addColorStop(0,`rgba(255,226,168,${a*0.9})`);
+        g.addColorStop(1,'rgba(220,150,60,0)');
+        bctx.fillStyle=g;
+        bctx.beginPath(); bctx.arc(x,y,m.r*3.2,0,Math.PI*2); bctx.fill();
+      });
+      bctx.restore();
+    }
+
+    if(el>=total){
+      fxClearInterval(iv);
+      drawBattle();
+      onDone&&onDone();
+    }
+  }, 33);
+}
+
 function checkBattleEnd(){
   const alliesAlive=units.some(u=>u.side==='ally'&&u.alive);
   const foesAlive=units.some(u=>u.side==='foe'&&u.alive);
   renderInfo();
-  if(!foesAlive){ endBattle(true); }
+  if(bossDying) return;              // 消滅の演出中は結果を出さない
+  if(!foesAlive){
+    // 竜を倒したときだけ、消えるまでの間を挟む
+    const fallen=units.find(u=>!u.alive && BIG_BOSS_SPRITES.has(u.sprite));
+    if(fallen && !fallen._mourned){
+      fallen._mourned=true;
+      bossDying=true;
+      phase='done';                  // この間は誰も行動できない
+      bossDeathFx(fallen, ()=>{ bossDying=false; endBattle(true); });
+      return;
+    }
+    endBattle(true);
+  }
   else if(!alliesAlive){ endBattle(false); }
 }
 
+/* 結果を二度出すと、金も経験値も二重に入る。
+   通常はそうならない呼び出し順だが、間違えたときの被害が大きいので鍵をかけておく。 */
+let battleResolved=false;
+
 function endBattle(win){
+  if(battleResolved) return;
+  battleResolved=true;
   phase='done';
   // 戦闘結果をパーティHPへ反映
   party.forEach(p=>{
