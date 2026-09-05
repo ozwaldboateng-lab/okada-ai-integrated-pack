@@ -2986,7 +2986,7 @@ function loadSpriteImages(){
    盤の上に余白が無いので頭と翼が画面の外へ出てしまう。
    ボスだけ低い係数を使い、絵がマスを跨ぐように置く。 */
 const BIG_BOSS_SPRITES=new Set(['dragon','blackDragon','goldenDragon']);
-const BOSS_DRAW_SCALE=3.5;
+const BOSS_DRAW_SCALE=5.25;   // 元画像は518px。252pxで描いてもまだ元の解像度に収まる
 const FOOT_NORMAL=0.96, FOOT_BOSS=0.62;
 
 // ゲームから呼ぶ統一インターフェース：タイル左上(dx,dy)・サイズsizeに収める
@@ -3415,7 +3415,7 @@ function startBattle(isBoss, midbossKey){
       spell:bossUnit.spell?{...bossUnit.spell, pow:Math.round(bossUnit.spell.pow*bs*0.55)}:null,
       exp:Math.round((bossUnit.exp||120)*bs),
       goldRange:bossUnit.goldRange?[Math.round(bossUnit.goldRange[0]*bs),Math.round(bossUnit.goldRange[1]*bs)]:null};
-    units.push(applyLoopMult({...scaled, side:'foe', x:Math.floor(BG/2), y:2, acted:false, alive:true}));
+    units.push(applyLoopMult({...scaled, side:'foe', x:Math.floor(BG/2), y:3, acted:false, alive:true}));
   }else if(midbossKey){
     // 中ボス1体＋手下の雑魚2体
     const mb=MIDBOSSES[midbossKey];
@@ -3640,6 +3640,30 @@ function drawBattle(){
       bctx.fillRect(bx,by,bw*Math.max(0,u.hp)/u.maxhp,2);
     }
   });
+
+  /* 巨躯のボスの背後や真横に回った駒は、絵の下に完全に隠れてしまう。
+     奥行きとしては正しい重なりだが、自分の駒が見えないのは操作の妨げになるので、
+     位置だけ分かる小さな印を上から重ねる。 */
+  const bigBoss=units.find(u=>u.alive && BIG_BOSS_SPRITES.has(u.sprite));
+  if(bigBoss){
+    const bs=TILE*BOSS_DRAW_SCALE;
+    const bx=BOFFX+bigBoss.x*TILE+TILE/2-bs/2;
+    const by=BOFFY+bigBoss.y*TILE+TILE-bs*FOOT_BOSS;
+    units.filter(u=>u.alive && u!==bigBoss && u.y<=bigBoss.y).forEach(u=>{
+      const px=BOFFX+u.x*TILE, py=BOFFY+u.y*TILE;
+      if(px+TILE<bx || px>bx+bs || py+TILE<by || py>by+bs) return;   // 重なっていない
+      const cx=px+TILE/2, cy=py+TILE/2;
+      bctx.save();
+      bctx.beginPath(); bctx.arc(cx,cy,TILE*0.26,0,Math.PI*2);
+      bctx.fillStyle='rgba(10,14,18,.85)'; bctx.fill();
+      bctx.lineWidth=2; bctx.strokeStyle=u.col||'#8fd8ff'; bctx.stroke();
+      bctx.fillStyle=u.col||'#8fd8ff';
+      bctx.font=`bold ${Math.round(TILE*0.34)}px "Shippori Mincho", serif`;
+      bctx.textAlign='center'; bctx.textBaseline='middle';
+      bctx.fillText(u.name[0], cx, cy+1);
+      bctx.restore();
+    });
+  }
 
   // キーボード操作中だけ、選択マスを示すカーソルを重ねる
   if(cursorVisible && phase==='player'){
