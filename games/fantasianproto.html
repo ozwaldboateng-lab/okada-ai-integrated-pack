@@ -2980,18 +2980,28 @@ function loadSpriteImages(){
 }
 
 
+/* 巨躯のボスは通常キャラと同じ基準では描けない。
+   縦位置の 0.96 は「足元をマスの下端に合わせて上へ伸ばす」値で、
+   1.2倍の駒に合わせたもの。3.5倍の竜に当てると2.5マス分せり上がり、
+   盤の上に余白が無いので頭と翼が画面の外へ出てしまう。
+   ボスだけ低い係数を使い、絵がマスを跨ぐように置く。 */
+const BIG_BOSS_SPRITES=new Set(['dragon','blackDragon','goldenDragon']);
+const BOSS_DRAW_SCALE=3.5;
+const FOOT_NORMAL=0.96, FOOT_BOSS=0.62;
+
 // ゲームから呼ぶ統一インターフェース：タイル左上(dx,dy)・サイズsizeに収める
 function drawSprite(ctx, name, dx, dy, size, scale){
   const cx=dx+size/2;
   // 画像スプライトが用意されていればそれを使う
   const img=SPRITE_IMG_OBJ[name];
   if(img){
+    const boss=BIG_BOSS_SPRITES.has(name);
     let drawSize=size*1.2;       // 通常キャラの描画倍率
-    if(name==='dragon' || name==='blackDragon' || name==='goldenDragon') drawSize=size*3.5;
+    if(boss) drawSize=size*BOSS_DRAW_SCALE;
     else if(scale && scale>1.2) drawSize=size*scale*1.2;
     // 中央寄せ、下端を足元に合わせる
     const drawX=cx-drawSize/2;
-    const drawY=dy+size - drawSize*0.96; // 足元はタイル下端付近
+    const drawY=dy+size - drawSize*(boss?FOOT_BOSS:FOOT_NORMAL);
     ctx.drawImage(img, drawX, drawY, drawSize, drawSize);
     return true;
   }
@@ -3405,7 +3415,7 @@ function startBattle(isBoss, midbossKey){
       spell:bossUnit.spell?{...bossUnit.spell, pow:Math.round(bossUnit.spell.pow*bs*0.55)}:null,
       exp:Math.round((bossUnit.exp||120)*bs),
       goldRange:bossUnit.goldRange?[Math.round(bossUnit.goldRange[0]*bs),Math.round(bossUnit.goldRange[1]*bs)]:null};
-    units.push(applyLoopMult({...scaled, side:'foe', x:Math.floor(BG/2), y:1, acted:false, alive:true}));
+    units.push(applyLoopMult({...scaled, side:'foe', x:Math.floor(BG/2), y:2, acted:false, alive:true}));
   }else if(midbossKey){
     // 中ボス1体＋手下の雑魚2体
     const mb=MIDBOSSES[midbossKey];
