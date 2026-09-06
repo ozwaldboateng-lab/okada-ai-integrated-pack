@@ -1691,14 +1691,19 @@ function freshParty(){
     {name:'ガザール', cls:'賢者', sprite:'sage', level:1, exp:0,
      base:{hp:34, atk:9, def:4, mov:3, rng:1}, spellBase:{name:'業火', type:'damage', pow:14, radius:4},
      equip:{weapon:'staff_oak', armor:'cloak_old'}, hp:34, mp:14},
-    {name:'戦士レン', cls:'戦士', sprite:'warrior', level:1, exp:0,
+    {name:'レン', cls:'戦士', sprite:'warrior', level:1, exp:0,
      base:{hp:46, atk:11, def:7, mov:3, rng:1},
      equip:{weapon:'sword_rust', armor:'armor_leather'}, hp:46, mp:0},
-    {name:'僧侶ミラ', cls:'僧侶', sprite:'priest', level:1, exp:0,
+    {name:'ミラ', cls:'僧侶', sprite:'priest', level:1, exp:0,
      base:{hp:30, atk:7, def:5, mov:4, rng:1}, spellBase:{name:'癒し', type:'heal', pow:18, radius:3},
      equip:{weapon:'rod_pilgrim', armor:'cloak_old'}, hp:30, mp:14},
   ];
 }
+// 以前の記録には職業名を頭に付けた名前が入っている。クラスチェンジしても
+// その頭だけは変わらず「戦士レン」が剣聖になっても戦士のままなので、
+// 読み込むときに落として現在の呼び名へ揃える。
+const LEGACY_NAMES={'戦士レン':'レン', '僧侶ミラ':'ミラ'};
+function fixName(n){ return LEGACY_NAMES[n] || n; }
 let party = freshParty();
 
 /* ===== 魔力（MP） =====
@@ -6034,7 +6039,7 @@ function loadGame(slot){
     if(!raw) return false;
     const d=JSON.parse(raw);
     party = d.party.map(m=>({
-      name:m.name, cls:m.cls, sprite:m.sprite, level:m.level, exp:m.exp,
+      name:fixName(m.name), cls:m.cls, sprite:m.sprite, level:m.level, exp:m.exp,
       base:{...m.base}, spellBase: m.spellBase ? {...m.spellBase} : null,
       equip:{...m.equip}, hp:m.hp, mp:m.mp
     }));
