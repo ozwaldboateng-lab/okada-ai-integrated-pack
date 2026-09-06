@@ -2538,6 +2538,20 @@ function closeConfirm(){ elConfirm.style.display='none'; confirmYesCb=null; conf
 document.getElementById('confirmYes').onclick=()=>{ const cb=confirmYesCb; closeConfirm(); if(cb) cb(); };
 document.getElementById('confirmNo').onclick =()=>{ const cb=confirmNoCb;  closeConfirm(); if(cb) cb(); };
 
+/* 階段を下りるか尋ねる。番人を倒した直後にも同じ問いを出すので、
+   move() から切り出して共有している。 */
+function promptDescend(){
+  SFX.dialog();
+  askConfirm('階段を下りますか？', ()=>{
+    SFX.stairs();
+    changeFloor(+1);
+    elExploreLog.textContent=`階段を下りた。地下 ${floorIndex+1} 階。`;
+    drawDungeon(); refreshHud();
+  }, ()=>{
+    elExploreLog.textContent='階段の前で立ち止まった。';
+  });
+}
+
 function move(forward){
   if(encLocked()) return;         // 霧に呑まれている間は進めない
   const fwd=DIRS[player.dir];
@@ -2598,15 +2612,7 @@ function move(forward){
       encSoon(350, ()=>fogSwallow(()=>startBattle(false, mb.key)));
       return;
     }
-    SFX.dialog();
-    askConfirm('階段を下りますか？', ()=>{
-      SFX.stairs();
-      changeFloor(+1);
-      elExploreLog.textContent=`階段を下りた。地下 ${floorIndex+1} 階。`;
-      drawDungeon(); refreshHud();
-    }, ()=>{
-      elExploreLog.textContent='階段の前で立ち止まった。';
-    });
+    promptDescend();
     return;
   }
   // 階段（上り）→B1なら町へ、それ以外は階上へ
@@ -5345,6 +5351,17 @@ document.getElementById('overlayBtn').onclick=()=>{
     elExploreLog.textContent='戦いを終え、再び迷宮を進む。';
   }
   drawDungeon(); refreshHud();
+
+  /* 番人は階段の上に陣取っている。倒したあとはその階段の上に立っているので、
+     ここで問わないと、いったん降りてもう一度乗り直すまで先へ進めない。 */
+  if(!wasLose && !wasClear){
+    const f=FLOORS[floorIndex];
+    const mb=FLOOR_MIDBOSS[floorIndex];
+    if(f.stairsDown && player.x===f.stairsDown.x && player.y===f.stairsDown.y && (!mb || mb.defeated)){
+      elExploreLog.textContent='番人は倒れた。階段はもう塞がれていない。';
+      setTimeout(promptDescend, 280);   // 結果パネルが閉じてから問う
+    }
+  }
 };
 
 function renderInfo(){
