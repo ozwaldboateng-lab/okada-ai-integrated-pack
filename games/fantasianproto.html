@@ -924,6 +924,7 @@
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="key" id="bTownToDungeon" style="max-width:240px;display:inline-block;width:100%;">迷宮へ降りる</button>
+      <button class="key" id="bTownToSky" style="max-width:240px;display:none;width:100%;margin-top:6px;">天蓋へ向かう</button>
     </div>
     <div class="log" id="townLog" style="margin-top:8px;">日が差している。ここではしばし、霧の脅威を忘れていられる。</div>
   </div>
@@ -1472,7 +1473,73 @@ const FLOOR_SRC=[
     "#*.!......$#$#",
     "##############",
   ],
+  // ── 天蓋（真竜を倒すと町から行ける、白い無機質な塔） ──
+  // 一層：無機質さを出すため、曲がりくねった通路ではなく部屋で構成する
+  [
+    "##############",
+    "#<...........#",
+    "#.####.#####.#",
+    "#.#!.#.#...#.#",
+    "#.#..#.#.#.#.#",
+    "#.#.##.#.#.#.#",
+    "#.#....#.#.#.#",
+    "#.######.#.#.#",
+    "#........#.#.#",
+    "#.######.#.#.#",
+    "#.#....#...#.#",
+    "#.#.$#.....>$#",
+    "##############",
+  ],
+  // 二層：中央に回廊。左右対称に寄せて人工物らしさを出す
+  [
+    "##############",
+    "#<....#......#",
+    "#.###.#.####.#",
+    "#.#.#.#.#..#.#",
+    "#.#.#...#.##.#",
+    "#.#.#####.##.#",
+    "#.#.......##.#",
+    "#.#####.#..#.#",
+    "#.....#.#.##.#",
+    "#.###.#.#..#.#",
+    "#$..#.#.##.#.#",
+    "#.!.#...##.>$#",
+    "##############",
+  ],
+  // 三層：最奥に祭壇。そこへ至る道を絞り、長い直線で「奥」を出す
+  [
+    "##############",
+    "#<...#.......#",
+    "####.#.#####.#",
+    "#$...#.#...#.#",
+    "#.####.#.#.#.#",
+    "#......#.#.#.#",
+    "######.#.#.#.#",
+    "#!.....#.#...#",
+    "#.######.###.#",
+    "#.#........#.#",
+    "#.#.######.#.#",
+    "#...#..*...#$#",
+    "##############",
+  ],
 ];
+
+/* ===== 天蓋 =====
+   真竜を倒したあとに町から入れる、迷宮とは別の場所。
+   迷宮の続きとして繋げず独立させたのは、B6の石版が「竜は黄昏ではない、
+   黄昏の器だ」と言っているため。器の先にあるものは、同じ穴の底ではなく
+   別の場所にいるほうが筋が通る。
+   FLOORS の後ろに足しているので floorIndex で引く配列はすべて伸ばすこと
+   （FLOOR_ENEMIES / FLOOR_SCALE / FLOOR_MIDBOSS / FLOOR_RUBBLE /
+     FLOOR_PALETTE / FLOOR_TABLETS）。 */
+const SKY_START=6;                       // 天蓋の最初の層（FLOORS の添字）
+const SKY_LAST=8;                        // 天蓋の最奥
+function isSky(fi){ return fi>=SKY_START; }
+// 画面に出す階の呼び名。迷宮は「地下N階」、天蓋は「N層」
+function floorLabel(fi){
+  return isSky(fi) ? `天蓋 ${['一','二','三'][fi-SKY_START] || (fi-SKY_START+1)}層`
+                   : `地下${fi+1}階`;
+}
 
 // 文字列フロアを {grid, stairsDown, stairsUp, altar, start} に変換
 function buildFloor(src){
@@ -1849,6 +1916,20 @@ const FLOOR_TABLETS={
         +'もう一度ここへ降りることになる。次に待つ影は、いまより深い」',
      after:'「よく戻った。霧はおまえの名も、いずれこの石に刻むだろう」'},
   ],
+  // 天蓋。B6の石版が立てた問い（竜は器にすぎない）に、ここで答える。
+  6: [
+    {text:'白い壁に継ぎ目がない。切り出した跡も、積んだ跡もない。'
+        +'──この場所は、建てられたのではない。'},
+  ],
+  7: [
+    {text:'壁に名簿が並んでいる。竜を斃した者の名だ。地下の石版と同じ筆跡で、'
+        +'しかしこちらには続きがある。「回収済」と。'},
+  ],
+  8: [
+    {text:'「器を配ったのは私だ。霧は災いではない。あれは器に注ぐためのものだ」'
+        +'──奥から、澄んだ声がする。',
+     after:'「また来たのか。何度でも、同じことを言おう。おまえも器だ」'},
+  ],
 };
 
 function readTablet(fi, idx){
@@ -1856,7 +1937,10 @@ function readTablet(fi, idx){
   const t=list && list[idx];
   if(!t){ elExploreLog.textContent='文字は削れて、もう読めない。'; return; }
   SFX.dialog();
-  elExploreLog.textContent = (loop>=2 && t.after) ? t.after : t.text;
+  // 迷宮は周回で、天蓋は主を倒したかどうかで「二度目」を判定する。
+  // 天蓋は周回の外にあるため、loop を見ると初回から再訪の文面が出てしまう。
+  const again = isSky(fi) ? angelDefeated : (loop>=2);
+  elExploreLog.textContent = (again && t.after) ? t.after : t.text;
 }
 
 const KEY_ITEMS={
@@ -2073,7 +2157,15 @@ function isWall(x,y){ return cellAt(x,y)===1; }
    奥ほど暗く、かつ霧に溶ける。以前は奥ほど明るい霧色へ寄せていたため、
    突き当りの壁が光って見えて奥行きが反転していた。 */
 let FOG_DEEP=[92,102,104];              // 奥は少し青みの冷たい霧
-const WARM=[0.12,0.02,-0.12];             // 灯りの色（手前ほど暖色に寄る）
+/* 灯りの色・斑の強さ・目地の濃さは、もともと全階共通の固定値だった。
+   天蓋のような白い面ではこれが致命的で、暖色補正で生成りに濁り、
+   斑が汚れに見え、濃い目地が「継ぎ目のない壁」という設定と食い違う。
+   階層ごとに差し替えられるようにして、既定値は従来どおりにしてある。 */
+const WARM_DEFAULT=[0.12,0.02,-0.12];     // 灯りの色（手前ほど暖色に寄る）
+let WARM=WARM_DEFAULT.slice();
+let GRAIN=1.0;                            // 面の斑の強さ（0で平滑）
+let JOINT_RGB='38,44,41';                 // 目地の色
+let JOINT_MUL=1.0;                        // 目地の濃さ（0で継ぎ目なし）
 function shade(base, z, mul){
   const lit  = 1/(1 + 0.16*z*z);          // 視点の灯り：距離の二乗で減衰
   const fogT = Math.min(0.86, 1-Math.exp(-0.21*z));
@@ -2084,7 +2176,7 @@ function shade(base, z, mul){
 // 目地の濃さも距離で薄める
 function jointStyle(z, a){
   const t = Math.max(0.30, 1-z/(MAXD*0.75));
-  return `rgba(38,44,41,${(a*t).toFixed(3)})`;
+  return `rgba(${JOINT_RGB},${(a*t*JOINT_MUL).toFixed(3)})`;
 }
 
 /* 階層ごとの色調。数値だけ上げても景色が同じだと深くなった実感が出ないので、
@@ -2096,6 +2188,15 @@ const FLOOR_PALETTE=[
   {wall:[ 127, 125, 130], side:[  90,  89,  92], floor:[  83,  81,  85], ceil:[  42,  39,  42], fog:[  59,  59,  74]}, // B4 青みの石
   {wall:[ 121, 110, 122], side:[  86,  76,  86], floor:[  79,  69,  78], ceil:[  40,  32,  38], fog:[  56,  50,  70]}, // B5 紫がかる
   {wall:[ 110, 100,  99], side:[  78,  69,  68], floor:[  71,  63,  61], ceil:[  35,  27,  26], fog:[  49,  43,  47]}, // B6 冷たい黒石
+  /* 天蓋。明度をわずかに上げるだけでは三層が見分けられなかったので、
+     層が上がるほど「継ぎ目が減り、斑が消え、色味が冷えていく」ようにした。
+     三層で目地がほぼ無くなるのは、石版の「継ぎ目がない」に合わせている。 */
+  {wall:[ 222, 224, 228], side:[ 190, 193, 199], floor:[ 202, 204, 209], ceil:[ 236, 238, 241], fog:[ 243, 245, 248],
+   warm:[0.01,0.01,0.02],  grain:0.45, joint:'120,130,145', jointMul:0.85}, // 一層：まだ石らしさが残る
+  {wall:[ 230, 232, 237], side:[ 199, 202, 209], floor:[ 211, 213, 219], ceil:[ 242, 244, 247], fog:[ 248, 250, 252],
+   warm:[0.00,0.01,0.04],  grain:0.22, joint:'140,152,170', jointMul:0.50}, // 二層：継ぎ目が薄れる
+  {wall:[ 238, 240, 245], side:[ 210, 213, 221], floor:[ 220, 223, 230], ceil:[ 248, 250, 252], fog:[ 252, 253, 255],
+   warm:[-0.01,0.00,0.05], grain:0.08, joint:'170,182,200', jointMul:0.18}, // 三層：ほぼ継ぎ目が無い
 ];
 let WALL_BASE  = FLOOR_PALETTE[0].wall;   // 突き当りの壁（正面から光が当たる）
 let SIDE_BASE  = FLOOR_PALETTE[0].side;   // 側壁（斜めなので少し暗い）
@@ -2106,6 +2207,10 @@ function applyFloorPalette(){
   const q=FLOOR_PALETTE[Math.min(floorIndex, FLOOR_PALETTE.length-1)] || FLOOR_PALETTE[0];
   WALL_BASE=q.wall; SIDE_BASE=q.side; FLOOR_BASE=q.floor; CEIL_BASE=q.ceil;
   FOG_DEEP=q.fog;
+  WARM = q.warm || WARM_DEFAULT;
+  GRAIN = q.grain===undefined ? 1.0 : q.grain;
+  JOINT_RGB = q.joint || '38,44,41';
+  JOINT_MUL = q.jointMul===undefined ? 1.0 : q.jointMul;
 }
 const COURSES    = 4;               // 石積みの段数（多すぎると方眼紙に見える）
 
@@ -2137,7 +2242,7 @@ function paintPlaneX(x, zN, zF, seed){
     const zr=zN+(zF-zN)*rnd();
     wash(dctx, projX(x,zr), projY((rnd()-0.4)*0.9, zr),
          Math.abs(projX(x,zF)-projX(x,zN))*0.5+6, Math.abs(hMid)*0.16+4,
-         rnd()>0.5?shade(SIDE_BASE,dM,1.18):shade(SIDE_BASE,dM,0.78), 0.17, rnd, 4);
+         rnd()>0.5?shade(SIDE_BASE,dM,1+0.18*GRAIN):shade(SIDE_BASE,dM,1-0.22*GRAIN), 0.17*GRAIN, rnd, 4);
   }
   const H=CEIL_H+FLOOR_H;
   for(let i=0;i<COURSES;i++){
@@ -2181,7 +2286,7 @@ function paintPlaneZ(z, x0, x1, seed){
   const rnd=mulberry32(seed);
   for(let i=0;i<6;i++){
     wash(dctx, l+rnd()*w, t+rnd()*h, w*0.26, h*0.2,
-         rnd()>0.5?shade(WALL_BASE,d,1.15):shade(WALL_BASE,d,0.8), 0.16, rnd, 5);
+         rnd()>0.5?shade(WALL_BASE,d,1+0.15*GRAIN):shade(WALL_BASE,d,1-0.20*GRAIN), 0.16*GRAIN, rnd, 5);
   }
   if(rnd()>0.4){  // 足元の苔
     wash(dctx, l+rnd()*w, b-h*0.18, w*0.24, h*0.13, shade([104,116,80],d), 0.22, rnd, 4);
@@ -2226,7 +2331,7 @@ function paintPlaneY(y, x0, x1, zN, zF, base, seed, kind){
     for(let i=0;i<3;i++){
       wash(dctx, projX(x0+(x1-x0)*rnd(),dM), projY(y,dM)-rnd()*8,
            Math.abs(projX(x1,dM)-projX(x0,dM))*0.35+4, 10,
-           rnd()>0.5?shade(base,dM,1.15):shade(base,dM,0.8), 0.18, rnd, 4);
+           rnd()>0.5?shade(base,dM,1+0.15*GRAIN):shade(base,dM,1-0.20*GRAIN), 0.18*GRAIN, rnd, 4);
     }
     dctx.restore();
     // 敷石の縦目地（消失点へ収束する）
@@ -2500,7 +2605,7 @@ function fogSwallow(onCover, onDone){
 
 /* ---------- 探索 操作 ---------- */
 function refreshHud(){
-  elPos.textContent=`地下${floorIndex+1}階`;
+  elPos.textContent=floorLabel(floorIndex);
   elDir.textContent=DIRS[player.dir].name;
   elSteps.textContent=player.steps;
   const total=party.reduce((s,u)=>s+Math.max(0,u.hp),0);
@@ -2547,10 +2652,10 @@ document.getElementById('confirmNo').onclick =()=>{ const cb=confirmNoCb;  close
    move() から切り出して共有している。 */
 function promptDescend(){
   SFX.dialog();
-  askConfirm('階段を下りますか？', ()=>{
+  askConfirm(isSky(floorIndex)?'さらに奥へ進みますか？':'階段を下りますか？', ()=>{
     SFX.stairs();
     changeFloor(+1);
-    elExploreLog.textContent=`階段を下りた。地下 ${floorIndex+1} 階。`;
+    elExploreLog.textContent=`${floorLabel(floorIndex)}へ進んだ。`;
     drawDungeon(); refreshHud();
   }, ()=>{
     elExploreLog.textContent='階段の前で立ち止まった。';
@@ -2623,7 +2728,7 @@ function move(forward){
   // 階段（上り）→B1なら町へ、それ以外は階上へ
   if(f.stairsUp && player.x===f.stairsUp.x && player.y===f.stairsUp.y){
     SFX.dialog();
-    if(floorIndex===0){
+    if(floorIndex===0 || floorIndex===SKY_START){
       askConfirm('地上へ戻りますか？', ()=>{
         SFX.stairs();
         openTown();
@@ -2631,10 +2736,10 @@ function move(forward){
         elExploreLog.textContent='階段の前で立ち止まった。';
       });
     }else{
-      askConfirm('階段を上りますか？', ()=>{
+      askConfirm(isSky(floorIndex)?'ひとつ下の層へ戻りますか？':'階段を上りますか？', ()=>{
         SFX.stairs();
         changeFloor(-1);
-        elExploreLog.textContent=`階段を上った。地下 ${floorIndex+1} 階。`;
+        elExploreLog.textContent=`${floorLabel(floorIndex)}へ戻った。`;
         drawDungeon(); refreshHud();
       }, ()=>{
         elExploreLog.textContent='階段の前で立ち止まった。';
@@ -2643,23 +2748,30 @@ function move(forward){
     return;
   }
   // 魔法陣＝ボス戦
-  if(f.altar && player.x===f.altar.x && player.y===f.altar.y && !bossDefeated && party.some(u=>u.hp>0)){
+  const bossCleared = isSky(floorIndex) ? angelDefeated : bossDefeated;
+  if(f.altar && player.x===f.altar.x && player.y===f.altar.y && !bossCleared && party.some(u=>u.hp>0)){
     SFX.encount();
-    elExploreLog.textContent='床に古い魔法陣。踏み込むと、奥から巨大な気配が……。';
+    elExploreLog.textContent = isSky(floorIndex)
+      ? '白い床に、ひとつだけ継ぎ目がある。踏み込むと、澄んだ声が近づいてくる……。'
+      : '床に古い魔法陣。踏み込むと、奥から巨大な気配が……。';
     encSoon(350, ()=>fogSwallow(()=>startBattle(true)));
     return;
   }
   // ランダムエンカウント（深い階ほど確率微増）
-  const encRate=0.24+floorIndex*0.04;
+  // 0.24+fi*0.04 のまま天蓋(fi=8)まで伸ばすと 0.56 になり、歩くたびに戦うことになる。
+  const encRate=Math.min(0.46, 0.24+floorIndex*0.04);
   if(forward && Math.random()<encRate && party.some(u=>u.hp>0)){
     SFX.encount();
     fogSwallow(()=>startBattle(false));
   } else {
     // ボスのいる階では魔法陣への距離でヒント
-    if(!bossDefeated && f.altar){
+    if(!bossCleared && f.altar){
       const d=Math.abs(player.x-f.altar.x)+Math.abs(player.y-f.altar.y);
-      if(d<=2) elExploreLog.textContent='強烈な熱気。すぐ近くに、巨大な気配がある。';
-      else if(d<=5) elExploreLog.textContent='奥から、焦げた匂いと低い唸りが漂ってくる。';
+      const near = isSky(floorIndex)
+        ? ['すぐ近くで、誰かが静かに息を継いでいる。', '澄んだ声が、壁の向こうで何かを数えている。']
+        : ['強烈な熱気。すぐ近くに、巨大な気配がある。', '奥から、焦げた匂いと低い唸りが漂ってくる。'];
+      if(d<=2) elExploreLog.textContent=near[0];
+      else if(d<=5) elExploreLog.textContent=near[1];
       else elExploreLog.textContent='静かだ……足音だけが響く。';
     }else{
       elExploreLog.textContent='静かだ……足音だけが響く。';
@@ -2981,6 +3093,11 @@ function loadTileImages(){
 const TILE_IMG_COUNT={rubble:3};
 function tileImg(kind, v){ return TILE_IMG_OBJ[kind+(v+1)]||null; }
 
+/* 天蓋の主の絵はまだ無いので、当面は聖女の絵を借りている。
+   絵が届いたら、この一行を  angel: 'data:image/webp;base64,…'  に
+   差し替えるだけでよい（参照側は sprite:'angel' しか見ていない）。 */
+SPRITE_IMG_DATA.angel = SPRITE_IMG_DATA.priestMaster;
+
 const SPRITE_IMG_OBJ={};
 function loadSpriteImages(){
   Object.keys(SPRITE_IMG_DATA).forEach(k=>{
@@ -2996,7 +3113,7 @@ function loadSpriteImages(){
    1.2倍の駒に合わせたもの。3.5倍の竜に当てると2.5マス分せり上がり、
    盤の上に余白が無いので頭と翼が画面の外へ出てしまう。
    ボスだけ低い係数を使い、絵がマスを跨ぐように置く。 */
-const BIG_BOSS_SPRITES=new Set(['dragon','blackDragon','goldenDragon']);
+const BIG_BOSS_SPRITES=new Set(['dragon','blackDragon','goldenDragon','angel']);
 /* 巨躯のボスは1枚絵なので、コマ割りの動きは持てない。
    代わりに、ゆっくりした呼吸（縦のわずかな伸縮）と、
    半分を割ってからの怒りの輝きで「生き物」に見せる。 */
@@ -3004,6 +3121,10 @@ let bossAnimT=0;      // 呼吸の位相（秒）
 let bossRage=false;   // HPが半分を割ったか
 let bossShake=0;      // 咆哮の揺れ（残りフレーム）
 const BOSS_DRAW_SCALE=5.25;   // 元画像は518px。252pxで描いてもまだ元の解像度に収まる
+/* 絵の素の大きさが足りないボスは、ここで個別に倍率を下げる。
+   天蓋の主はまだ 128px の借り物なので、5.25倍(252px)で描くと2倍に伸びて眠くなる。
+   512px 級の絵が用意できたら、この行から angel を外せば竜と同じ迫力になる。 */
+const BOSS_SPRITE_SCALE={angel:3.0};
 const FOOT_NORMAL=0.96, FOOT_BOSS=0.62;
 
 // ゲームから呼ぶ統一インターフェース：タイル左上(dx,dy)・サイズsizeに収める
@@ -3014,7 +3135,7 @@ function drawSprite(ctx, name, dx, dy, size, scale){
   if(img){
     const boss=BIG_BOSS_SPRITES.has(name);
     let drawSize=size*1.2;       // 通常キャラの描画倍率
-    if(boss) drawSize=size*BOSS_DRAW_SCALE;
+    if(boss) drawSize=size*(BOSS_SPRITE_SCALE[name] || BOSS_DRAW_SCALE);
     else if(scale && scale>1.2) drawSize=size*scale*1.2;
     if(boss){
       // 怒りの輝き。絵そのものには触れず、背後に置くだけ
@@ -3180,6 +3301,19 @@ const ENEMY_POOL=[
     counterRate:0.30},
   {name:'悪魔',    hp:52,maxhp:52,atk:15,def:6,mov:3,rng:1,col:'#8e2a1f',sprite:'demon',  rank:3, scale:1.15,
     spell:{name:'業の炎', type:'damage', pow:16, radius:4}},
+
+  // ── 天蓋の住人 ──
+  // 絵が用意できるまで既存スプライトを借りている。sprite: を差し替えれば
+  // それだけで見た目が入れ替わる（名前も数値もここで完結している）。
+  {name:'白磁の番人', hp:44,maxhp:44,atk:13,def:11,mov:2,rng:1,col:'#e8e8ee',sprite:'livingArmor', rank:3, sky:true},
+  {name:'無貌の詠唱者', hp:30,maxhp:30,atk:12,def:5,mov:2,rng:3,col:'#dcd8e8',sprite:'sorcerer', rank:3, sky:true,
+    spell:{name:'聖句', type:'damage', pow:18, radius:4}},
+  {name:'石の熾天使', hp:48,maxhp:48,atk:14,def:10,mov:3,rng:1,col:'#d8dce4',sprite:'gargoyle', rank:3, sky:true, scale:1.2},
+  {name:'白銀の騎士', hp:52,maxhp:52,atk:17,def:9,mov:3,rng:1,col:'#cfd6e0',sprite:'darkKnight', rank:3, sky:true,
+    counterRate:0.35},
+  {name:'唱和する骨', hp:34,maxhp:34,atk:14,def:7,mov:3,rng:1,col:'#eceade',sprite:'skeleton', rank:3, sky:true},
+  {name:'零れた聖女', hp:40,maxhp:40,atk:13,def:7,mov:3,rng:2,col:'#f0e6ee',sprite:'priestMaster', rank:3, sky:true,
+    spell:{name:'裁きの燐', type:'damage', pow:20, radius:4}},
 ];
 
 // 階層別の出現テーブル（B1=index0 …）。深いほど強い敵が増える。
@@ -3191,11 +3325,15 @@ const FLOOR_ENEMIES=[
   ['ハーピー','ガーゴイル','トロル','生ける鎧','呪術師','トロル'],             // B4：硬い相手が増える
   ['メデューサ','ミノタウルス','オーガ','生ける鎧','大蛇','ガーゴイル'],       // B5：主級が並ぶ
   ['吸血鬼','暗黒騎士','ワイバーン','バジリスク','悪魔','大蛇','ミノタウルス'], // B6：古竜の領域
+  ['白磁の番人','唱和する骨','無貌の詠唱者','白磁の番人','唱和する骨'],              // 天蓋一層：硬い門番と詠唱
+  ['石の熾天使','白銀の騎士','無貌の詠唱者','白磁の番人','石の熾天使'],              // 天蓋二層
+  ['白銀の騎士','零れた聖女','石の熾天使','白銀の騎士','零れた聖女','無貌の詠唱者'], // 天蓋三層
 ];
 /* 階層ごとの敵の強さ倍率。
    素の敵データは B1 を基準にしてあるので、深い階ではここで引き上げる。
    これが無いと、味方の成長に敵が置いていかれて全戦闘が作業になる。 */
-const FLOOR_SCALE=[1.00, 1.55, 2.20, 3.00, 3.90, 4.90];
+const FLOOR_SCALE=[1.00, 1.55, 2.20, 3.00, 3.90, 4.90,
+                   5.80, 6.60, 7.40];   // 天蓋一〜三層
 function floorScale(fi){ return FLOOR_SCALE[Math.min(fi, FLOOR_SCALE.length-1)] || 1; }
 // 雑魚敵に階層倍率をかける（ボス・中ボスは固有値を持つので対象外）
 function applyFloorScale(enemy, fi){
@@ -3247,6 +3385,21 @@ const GOLDEN_DRAGON={
   multiAttack:3,  // 1ターンに3回行動（三つ首それぞれが動く）
 };
 
+/* 天蓋の主。
+   竜を「器」と呼んだ石版の答えにあたる存在なので、四体目の竜にはしていない。
+   数値は真竜（周回3で HP5146 / ATK344 / DEF60）との比で置いた：
+   HPを約1.25倍にして長く、攻撃力は少し下げ、射程3で必ず届くようにしてある。
+   竜より「削り切るのが遠い」手触りを狙っているが、実戦での重さは未確認。
+   重すぎ・軽すぎの調整は hp と atk の二つだけで効く。 */
+const ANGEL={
+  name:'天蓋の主', hp:520, maxhp:520, atk:26, def:13, mov:2, rng:3,
+  col:'#f2f0e6', sprite:'angel', rank:3, boss:true, goldRange:[1200,1500],
+  spell:{name:'審判の光', type:'breath', pow:46, radius:5},
+  dropTable:{ relic:1.0 },
+  multiAttack:3,
+  exp:400,
+};
+
 // 中ボス（各階の下り階段の番人）
 const MIDBOSSES={
   giantGoblin: {
@@ -3290,10 +3443,13 @@ const FLOOR_MIDBOSS=[
   {key:'lich',        defeated:false},  // B4
   {key:'hydra',       defeated:false},  // B5
   null,                                  // B6：階段は上りだけ、最終ボス（古竜）が控える
+  null, null, null,                      // 天蓋：番人は置かず、最奥の一体だけで締める
 ];
 
 let bossDefeated=false; // クリアフラグ（最終ボス）
 let loop=1;             // 周回数（2周目以降、敵が強化される）
+let skyUnlocked=false;  // 真竜を倒すと立つ。以降ずっと町から天蓋へ行ける
+let angelDefeated=false;// 天蓋の主を倒したか（迷宮の bossDefeated とは別勘定）
 function enemyMultiplier(){ return 1 + (loop-1)*0.5; }  // 1周目=1.0、2周目=1.5、3周目=2.0…
 
 // 敵オブジェクトに周回倍率を適用する。HP/atk/def/spell.powを上昇させる。
@@ -3322,7 +3478,8 @@ const TERRAIN={
   rubble:{name:'瓦礫', block:true,  desc:'崩れ落ちた柱。通り抜けられない（矢や魔法は越えられる）。'},
 };
 // 階層ごとに置く瓦礫の数。盤面は180度回転で対称に置くので「対の数」
-const FLOOR_RUBBLE=[3, 3, 2, 3, 2, 3];
+const FLOOR_RUBBLE=[3, 3, 2, 3, 2, 3,
+                    2, 2, 1];   // 天蓋：白い広間なので瓦礫は控えめに
 let terrainGrid=[];   // terrainGrid[y][x] = TERRAIN のキー
 
 function terrainKeyAt(x,y){
@@ -3435,10 +3592,14 @@ function startBattle(isBoss, midbossKey){
     }
   }
   if(isBoss){
-    // 最終ボス：1周目=古竜、2周目=影の古竜、3周目以降=黄昏の真竜
+    // 最終ボス：1周目=古竜、2周目=影の古竜、3周目以降=黄昏の真竜。
+    // 天蓋の最奥だけは竜ではなく天蓋の主。
     let bossUnit=DRAGON;
-    if(loop>=3) bossUnit=GOLDEN_DRAGON;
+    if(isSky(floorIndex)) bossUnit=ANGEL;
+    else if(loop>=3) bossUnit=GOLDEN_DRAGON;
     else if(loop>=2) bossUnit=BLACK_DRAGON;
+    // 竜の倍率は B6 基準で固定されている。天蓋の主も同じ土俵に乗せたいので
+    // 階層倍率ではなく同じ係数を使う（天蓋の階層倍率は雑魚にだけ効かせる）。
     const bs=floorScale(5)*1.25;
     const scaled={...bossUnit,
       hp:Math.round(bossUnit.hp*bs), maxhp:Math.round(bossUnit.maxhp*bs),
@@ -3480,7 +3641,10 @@ function startBattle(isBoss, midbossKey){
   overlay.style.display='none';
   overlay.className='overlay';
   if(isBoss){
-    if(loop>=3){
+    if(isSky(floorIndex)){
+      elHead.textContent='― 天蓋の主が振り向く ―';
+      elHint.textContent='器を配っていたもの。射程が長く、逃げ場はない。';
+    }else if(loop>=3){
       elHead.textContent='― 黄昏の真竜が三つの首をもたげる ―';
       elHint.textContent='黄金の竜、三相の災厄。これが本当の黄昏。';
     }else if(loop>=2){
@@ -3689,7 +3853,7 @@ function drawBattle(){
      位置だけ分かる小さな印を上から重ねる。 */
   const bigBoss=units.find(u=>u.alive && BIG_BOSS_SPRITES.has(u.sprite));
   if(bigBoss){
-    const bs=TILE*BOSS_DRAW_SCALE;
+    const bs=TILE*(BOSS_SPRITE_SCALE[bigBoss.sprite] || BOSS_DRAW_SCALE);
     const bx=BOFFX+bigBoss.x*TILE+TILE/2-bs/2;
     const by=BOFFY+bigBoss.y*TILE+TILE-bs*FOOT_BOSS;
     units.filter(u=>u.alive && u!==bigBoss && u.y<=bigBoss.y).forEach(u=>{
@@ -5090,7 +5254,7 @@ function bossDeathFx(boss, onDone){
   noise({dur:1.6, vol:0.16, hpf:60, lpf:900});                       // 崩れる唸り
   tone({f:150, f2:42, dur:1.9, type:'sawtooth', vol:0.13, attack:0.06}); // ゆっくり沈む持続音
 
-  const size=TILE*BOSS_DRAW_SCALE;
+  const size=TILE*(BOSS_SPRITE_SCALE[boss.sprite] || BOSS_DRAW_SCALE);
   const cx=BOFFX+boss.x*TILE+TILE/2;
   const baseY=BOFFY+boss.y*TILE+TILE-size*FOOT_BOSS;
   const rnd=mulberry32(0x5eed ^ (boss.x*31+boss.y));
@@ -5202,6 +5366,7 @@ function endBattle(win){
   if(win){
     // 倒した敵にボスがいたか
     const beatBoss=units.some(u=>u.side==='foe'&&u.boss);
+    const wasSky=isSky(floorIndex);   // 天蓋の主か、迷宮の竜か
     const beatMid=units.some(u=>u.side==='foe'&&u.midboss);
     if(beatMid){
       // 撃破した中ボスをフロアフラグへ
@@ -5291,17 +5456,27 @@ function endBattle(win){
     if(beatBoss){
       // ===== クリア =====
       SFX.clear();
-      bossDefeated=true;
       overlay.className='overlay clear';
       // 周回によってメッセージを分岐
       let bossName='黄昏の古竜';
       let taleHtml='霧は晴れ、聖域に淡い光が差した。<br>名を奪われたものたちが、束の間、その輪郭を取り戻す。<br>旅の終わり――そして、まだ語られぬ物語の始まり。';
-      if(loop>=3){
+      if(wasSky){
+        // 天蓋は周回の外にある。ここで bossDefeated を立てると
+        // 町から降りたときに周回が進んでしまうので、別の旗を使う。
+        angelDefeated=true;
+        bossName='天蓋の主';
+        taleHtml='声が途切れ、白い壁にはじめて継ぎ目が走った。<br>器を配っていたものは、器ですらなかったのかもしれない。<br>霧はまだ晴れない。だが、注ぐ手はもう無い。';
+      }else if(loop>=3){
+        bossDefeated=true;
         bossName='黄昏の真竜';
-        taleHtml='三つの首が、ついに堕ちた。<br>黄昏の極まりが裂け、聖域の奥に長い静寂が訪れる。<br>三人は何も語らず、ただ霧の晴れた空を見上げた。';
+        taleHtml='三つの首が、ついに堕ちた。<br>黄昏の極まりが裂け、聖域の奥に長い静寂が訪れる。<br>──町の外れに、いままで無かった白い塔が建っている。';
+        skyUnlocked=true;   // 以降ずっと町から天蓋へ行ける
       }else if(loop>=2){
+        bossDefeated=true;
         bossName='影の古竜';
         taleHtml='夜の竜は、紫の闇に溶けて消えた。<br>古竜の影さえも斃された聖域に、もう一段深い闇が遠ざかる。<br>だが、霧の底にはまだ別の気配が眠っているのかもしれない。';
+      }else{
+        bossDefeated=true;
       }
       document.getElementById('overlayMsg').textContent=`${bossName}、堕つ`;
       elHead.textContent=`― ${bossName}を打ち倒した ―`;
@@ -5541,7 +5716,11 @@ function openTown(){
     else elTownSub.textContent='日のあたる、束の間の安息';
   }
   refreshTownGold();
-  elTownLog.textContent='日が差している。ここではしばし、霧の脅威を忘れていられる。';
+  const skyBtn=document.getElementById('bTownToSky');
+  if(skyBtn) skyBtn.style.display = skyUnlocked ? '' : 'none';
+  elTownLog.textContent = skyUnlocked
+    ? '日が差している。町の外れに、白い塔が影も落とさずに建っている。'
+    : '日が差している。ここではしばし、霧の脅威を忘れていられる。';
 }
 function closeTown(){
   BGM.play('dungeon');
@@ -5972,6 +6151,26 @@ document.getElementById('bShopBack').onclick=closeShop;
 document.getElementById('bTavern').onclick=openTavern;
 document.getElementById('bTavernBack').onclick=closeTavern;
 document.getElementById('bTownToDungeon').onclick=closeTown;
+document.getElementById('bTownToSky').onclick=enterSky;
+
+/* 天蓋へ入る。
+   closeTown と分けているのは、あちらが「町を出たら周回を進める」役目を
+   持っているため。天蓋は周回の外にあるので、その処理を通してはいけない。 */
+function enterSky(){
+  BGM.play('dungeon');
+  hideView(elTownView);
+  showView(elExploreView);
+  floorIndex=SKY_START;
+  MAP=FLOORS[floorIndex].grid; MW=MAP[0].length; MH=MAP.length;
+  const up=FLOORS[floorIndex].stairsUp;
+  // 入り口のマスに立たせると、一歩目で「町へ戻りますか」を聞かれてしまう
+  player.x=up.x+1; player.y=up.y; player.dir=1;
+  applyFloorPalette();
+  markVisited();
+  drawDungeon(); refreshHud();
+  elExploreLog.textContent='白い光の中に踏み込んだ。足音が、返ってこない。';
+  autoSave();
+}
 
 /* ---------- セーブ・ロード ---------- */
 /* セーブ枠は2つ。教会で刻む「記録」と、階層移動などで書かれる「自動記録」。
@@ -5997,6 +6196,8 @@ function saveGame(slot){
       player:{x:player.x, y:player.y, dir:player.dir, steps:player.steps},
       bossDefeated,
       loop,
+      skyUnlocked,
+      angelDefeated,
       hiredCompanions: Object.keys(hiredCompanions).reduce((acc,k)=>{
         const c=hiredCompanions[k];
         acc[k]={cls:c.cls, name:c.name, sprite:c.sprite, level:c.level, exp:c.exp, hp:c.hp, mp:c.mp, base:{...c.base}, equip:{...c.equip}, beastSlay:c.beastSlay};
@@ -6051,6 +6252,9 @@ function loadGame(slot){
     player.x=d.player.x; player.y=d.player.y; player.dir=d.player.dir; player.steps=d.player.steps||0;
     bossDefeated=!!d.bossDefeated;
     loop=d.loop||1;
+    // 天蓋より前の記録には無い項目。周回3を越えている記録なら解禁済みとみなす
+    skyUnlocked = d.skyUnlocked!==undefined ? !!d.skyUnlocked : (d.loop||1)>3;
+    angelDefeated=!!d.angelDefeated;
     hiredCompanions = d.hiredCompanions || {};
     activeCompanion = d.activeCompanion || null;
     if(d.midbosses){
@@ -6120,6 +6324,8 @@ function startNewGame(){
   player.x=1; player.y=1; player.dir=1; player.steps=0;
   bossDefeated=false;
   loop=1;
+  skyUnlocked=false;
+  angelDefeated=false;
   hiredCompanions={};
   activeCompanion=null;
   FLOORS.forEach(f=>{ f.visited=f.grid.map(row=>row.map(()=>false)); f.opened=(f.chests||[]).map(()=>false); });
@@ -6143,7 +6349,7 @@ function openContinueChoice(){
     try{
       const d=JSON.parse(localStorage.getItem(SLOT_KEY[sl]));
       const lv=d.party&&d.party[0]?d.party[0].level:'?';
-      where=`地下${(d.floorIndex||0)+1}階　Lv.${lv}　${d.gold||0} G`;
+      where=`${floorLabel(d.floorIndex||0)}　Lv.${lv}　${d.gold||0} G`;
     }catch(e){}
     elSpellChoiceList.appendChild(choiceButton(
       `${SLOT_NAME[sl]}　${t||''}`, where,
