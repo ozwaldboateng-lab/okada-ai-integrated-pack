@@ -34,3 +34,6 @@ apps/okada-kernel-service/data/auto_calibration/lab_reports/
 Thumbs.db
 .vscode/
 .idea/
+
+# pack_sprites.py が残す控え（元の絵をそのまま抱えているため大きい）
+*.pre-webp.bak
