@@ -1743,8 +1743,8 @@ const EQUIP={
      noRandom を立てているのは、通常の epic 抽選に混ざると
      「番人から手に入れる」という道筋が崩れるため。 */
   sword_beast:  {name:'獣の剣',   slot:'weapon', wclass:'戦士', rarity:'epic', mods:{atk:20}, angelSlay:2.5, noRandom:true, price:0},
-  staff_beast:  {name:'獣の杖',   slot:'weapon', wclass:'賢者', rarity:'epic', mods:{atk:20, spellPow:12}, angelSlay:2.5, noRandom:true, price:0},
-  rod_beast:    {name:'獣の錫杖', slot:'weapon', wclass:'僧侶', rarity:'epic', mods:{atk:20, spellPow:12}, angelSlay:2.5, noRandom:true, price:0},
+  staff_beast:  {name:'獣の杖',   slot:'weapon', wclass:'賢者', rarity:'epic', mods:{atk:20, spellPow:20}, angelSlay:2.5, noRandom:true, price:0},
+  rod_beast:    {name:'獣の錫杖', slot:'weapon', wclass:'僧侶', rarity:'epic', mods:{atk:20, spellPow:20}, angelSlay:2.5, noRandom:true, price:0},
 
   robe_silksong: {name:'光絹のローブ',   slot:'armor', heavy:false, rarity:'epic', mods:{def:10, mov:1}, price:0},
   armor_scale:   {name:'竜鱗の鎧',       slot:'armor', heavy:true,  rarity:'epic', mods:{def:18}, price:0},
@@ -1977,6 +1977,11 @@ const KEY_ITEMS={
 
 // 動物・獣型の敵スプライト（狩人特効の対象）
 const BEAST_SPRITES = new Set(['bat','harpy','chimera','gargoyle','wolf','wyvern','basilisk','serpent']);
+/* 獣の三種の落ちやすさ（天蓋の住人1体につき、1本ごとの確率）。
+   1戦に3〜4体出るので、特定の1本が出るのは1戦あたり15〜19%、
+   だいたい5〜6戦に1本という見当。 */
+const BEAST_DROP={ sword_beast:0.05, staff_beast:0.05, rod_beast:0.05 };
+
 // 天使特効の対象。九天使すべて（雑魚も番人も主も）
 const ANGEL_SPRITES = new Set(['seraphim','cherubim','thrones','dominions','virtues',
                                'powers','principalities','archangels','angels']);
@@ -3486,8 +3491,6 @@ const MIDBOSSES={
     // 輪だけの姿で歩かない。射程3から動かずに焼く
     spell:{name:'無数の眼', type:'damage', pow:17, radius:4, fx:'beam'},
     dropTable:{ rare:0.45, epic:0.50 },
-    // 天蓋の最初の番人。獣の三種をここで渡さないと、この先が通れない
-    fixedDrops:['sword_beast','staff_beast','rod_beast'],
   },
   cherubim: {
     name:'智天使', hp:215, maxhp:215, atk:16, def:10, mov:2, rng:2,
@@ -5671,11 +5674,14 @@ function endBattle(win){
         const drop = (foe.boss||foe.midboss) ? 'elixir' : 'herb';
         addItem(drop); got.push(drop);
       }
-      // 確定で渡す装備（未入手のものだけ）。抽選ではないので必ず手に入る
-      if(foe.fixedDrops){
-        foe.fixedDrops.forEach(k=>{
+      // 天蓋の住人が稀に落とす獣の三種。
+      // 通常のレアリティ抽選に載せると迷宮の epic 枠にも混ざってしまうので、
+      // 天蓋の敵（sky:true）だけを対象に、一本ずつ独立して判定する。
+      // すでに持っている武器は落とさない（同じものが増えても意味が無い）。
+      if(foe.sky){
+        Object.keys(BEAST_DROP).forEach(k=>{
           const have = inventory[k] || party.some(m=>m.equip.weapon===k || m.equip.armor===k);
-          if(!have){ addItem(k); got.push(k); }
+          if(!have && Math.random()<BEAST_DROP[k]){ addItem(k); got.push(k); }
         });
       }
       // キーアイテム抽選（中ボス等が固有で持つ）
