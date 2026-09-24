@@ -1659,17 +1659,27 @@ function drawMinimap(){
 // 節目で自動的に記録する。教会だけが頼りだと、全滅の巻き戻しが大きすぎる
 function autoSave(){ try{ saveGame('auto'); }catch(e){} }
 
+/* 階層を移るときに必ず揃えるもの。
+   floorIndex を書き換えるだけの箇所が7つに散らばっていて、そのうち3つが
+   配色の適用を取りこぼしていた。とくに closeTown が抜けていたため、
+   天蓋（白）から町を経由して迷宮へ降りると、迷宮が白いままになっていた。
+   配色は WALL_BASE などの変数に焼き付ける作りなので、
+   階層を変えたのに適用し直さないと前の場所の色が残る。以後は必ずここを通す。 */
+function enterFloor(fi){
+  floorIndex=fi;
+  MAP=FLOORS[floorIndex].grid;
+  MW=MAP[0].length; MH=MAP.length;
+  applyFloorPalette();
+}
+
 function changeFloor(delta){
   const ni=floorIndex+delta;
   if(ni<0 || ni>=FLOORS.length) return;
-  floorIndex=ni;
-  MAP=FLOORS[floorIndex].grid;
-  MW=MAP[0].length; MH=MAP.length;
+  enterFloor(ni);
   // 到着位置：下りたら上り階段の上、上ったら下り階段の上
   const f=FLOORS[floorIndex];
   const arrive = delta>0 ? f.stairsUp : f.stairsDown;
   if(arrive){ player.x=arrive.x; player.y=arrive.y; }
-  applyFloorPalette();
   markVisited();
   autoSave();          // 階層をまたいだ時点を自動で記録
 }
@@ -2726,8 +2736,7 @@ function move(forward){
       askConfirm(`光の渦が立ち昇っている。\n飛びますか？${labelText}`, ()=>{
         SFX.stairs();
         // フロア切替＆位置設定
-        floorIndex=link.floor;
-        MAP=FLOORS[floorIndex].grid; MW=MAP[0].length; MH=MAP.length;
+        enterFloor(link.floor);
         player.x=link.x; player.y=link.y;
         elExploreLog.textContent='光に包まれ、別の場所へ飛ばされた。';
         drawDungeon(); refreshHud();
@@ -5761,7 +5770,7 @@ document.getElementById('overlayBtn').onclick=()=>{
       party=freshParty();
       inventory={};
       gold=0;
-      floorIndex=0; MAP=FLOORS[0].grid; MW=MAP[0].length; MH=MAP.length;
+      enterFloor(0);
       FLOORS.forEach(f=>{ f.visited=f.grid.map(row=>row.map(()=>false)); });
       FLOOR_MIDBOSS.forEach(mb=>{ if(mb) mb.defeated=false; });
       player.x=1; player.y=1; player.dir=1;
@@ -5986,8 +5995,7 @@ function closeTown(){
   // 迷宮へ戻る：B1の開始地点に戻す（上り階段マスに立った状態だと無限ループになるので、隣のマスへ）
   hideView(elTownView);
   showView(elExploreView);
-  floorIndex=0;
-  MAP=FLOORS[0].grid; MW=MAP[0].length; MH=MAP.length;
+  enterFloor(0);
   // 上り階段の隣、(2,1)あたりに戻す（通路なので確実）
   player.x=2; player.y=1; player.dir=1; // 東向き
   drawDungeon(); refreshHud();
@@ -6415,12 +6423,10 @@ function enterSky(){
   BGM.play('dungeon');
   hideView(elTownView);
   showView(elExploreView);
-  floorIndex=SKY_START;
-  MAP=FLOORS[floorIndex].grid; MW=MAP[0].length; MH=MAP.length;
+  enterFloor(SKY_START);
   const up=FLOORS[floorIndex].stairsUp;
   // 入り口のマスに立たせると、一歩目で「町へ戻りますか」を聞かれてしまう
   player.x=up.x+1; player.y=up.y; player.dir=1;
-  applyFloorPalette();
   markVisited();
   drawDungeon(); refreshHud();
   elExploreLog.textContent='白い光の中に踏み込んだ。足音が、返ってこない。';
@@ -6501,9 +6507,7 @@ function loadGame(slot){
     }));
     inventory={...d.inventory};
     gold=d.gold||0;
-    floorIndex=d.floorIndex||0;
-    MAP=FLOORS[floorIndex].grid; MW=MAP[0].length; MH=MAP.length;
-    applyFloorPalette();
+    enterFloor(d.floorIndex||0);
     player.x=d.player.x; player.y=d.player.y; player.dir=d.player.dir; player.steps=d.player.steps||0;
     bossDefeated=!!d.bossDefeated;
     loop=d.loop||1;
@@ -6574,8 +6578,7 @@ function startNewGame(){
   party=freshParty();
   inventory={};
   gold=0;
-  floorIndex=0; MAP=FLOORS[0].grid; MW=MAP[0].length; MH=MAP.length;
-  applyFloorPalette();
+  enterFloor(0);
   player.x=1; player.y=1; player.dir=1; player.steps=0;
   bossDefeated=false;
   loop=1;
