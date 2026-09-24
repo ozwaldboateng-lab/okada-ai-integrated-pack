@@ -1719,6 +1719,14 @@ const EQUIP={
   sword_slayer:  {name:'竜断ち（ドラゴンスレイヤー）', slot:'weapon', wclass:'戦士', rarity:'epic', mods:{atk:12}, slayMult:2.0, price:0},
   staff_forbidden:{name:'禁忌の杖',      slot:'weapon', wclass:'賢者', rarity:'epic', mods:{atk:3, spellPow:20, spellRadius:1}, price:0},
   rod_lightblade:{name:'聖光の錫杖',     slot:'weapon', wclass:'僧侶', rarity:'epic', mods:{atk:5, spellPow:22}, price:0},
+  /* 獣の三種：天蓋の最初の番人（座天使）が確定で落とす。
+     天使は器を配る側で、こちらは配られた側の獣。討つための得物という筋。
+     noRandom を立てているのは、通常の epic 抽選に混ざると
+     「番人から手に入れる」という道筋が崩れるため。 */
+  sword_beast:  {name:'獣の剣',   slot:'weapon', wclass:'戦士', rarity:'epic', mods:{atk:20}, angelSlay:2.5, noRandom:true, price:0},
+  staff_beast:  {name:'獣の杖',   slot:'weapon', wclass:'賢者', rarity:'epic', mods:{atk:20, spellPow:12}, angelSlay:2.5, noRandom:true, price:0},
+  rod_beast:    {name:'獣の錫杖', slot:'weapon', wclass:'僧侶', rarity:'epic', mods:{atk:20, spellPow:12}, angelSlay:2.5, noRandom:true, price:0},
+
   robe_silksong: {name:'光絹のローブ',   slot:'armor', heavy:false, rarity:'epic', mods:{def:10, mov:1}, price:0},
   armor_scale:   {name:'竜鱗の鎧',       slot:'armor', heavy:true,  rarity:'epic', mods:{def:18}, price:0},
 
@@ -1950,6 +1958,9 @@ const KEY_ITEMS={
 
 // 動物・獣型の敵スプライト（狩人特効の対象）
 const BEAST_SPRITES = new Set(['bat','harpy','chimera','gargoyle','wolf','wyvern','basilisk','serpent']);
+// 天使特効の対象。九天使すべて（雑魚も番人も主も）
+const ANGEL_SPRITES = new Set(['seraphim','cherubim','thrones','dominions','virtues',
+                               'powers','principalities','archangels','angels']);
 // 次のレベルに必要な経験値
 function expToNext(level){ return level*20; }
 // 敵のrankごとの経験値
@@ -2010,6 +2021,7 @@ function rollGold(enemy){
 function droppableKeys(rarity){
   return Object.keys(EQUIP).filter(key=>{
     if(EQUIP[key].rarity!==rarity) return false;
+    if(EQUIP[key].noRandom) return false;   // 確定ドロップ専用。抽選には出さない
     return party.some(m=>canEquip(m.cls,key));
   });
 }
@@ -2063,6 +2075,7 @@ function effStats(member){
   const s={maxhp:b.hp, atk:b.atk, def:b.def, mov:b.mov, rng:b.rng};
   let spellPow=0, spellRadius=0;
   let slayMult=1.0;     // ドラゴン特効倍率（複数装備があれば最大値を採用）
+  let angelSlay=1.0;    // 天使特効倍率。獣の三種が持つ
   ['weapon','armor'].forEach(slot=>{
     const key=member.equip&&member.equip[slot];
     const e=key&&EQUIP[key];
@@ -2071,8 +2084,10 @@ function effStats(member){
     s.atk+=m.atk||0; s.def+=m.def||0; s.mov+=m.mov||0; s.rng+=m.rng||0;
     spellPow+=m.spellPow||0; spellRadius+=m.spellRadius||0;
     if(e.slayMult && e.slayMult>slayMult) slayMult=e.slayMult;
+    if(e.angelSlay && e.angelSlay>angelSlay) angelSlay=e.angelSlay;
   });
   s.slayMult=slayMult;
+  s.angelSlay=angelSlay;
   s.maxmp = mpMax(member);
   // 通常魔法
   if(member.spellBase){
@@ -3453,6 +3468,8 @@ const MIDBOSSES={
     // 輪だけの姿で歩かない。射程3から動かずに焼く
     spell:{name:'無数の眼', type:'damage', pow:17, radius:4},
     dropTable:{ rare:0.45, epic:0.50 },
+    // 天蓋の最初の番人。獣の三種をここで渡さないと、この先が通れない
+    fixedDrops:['sword_beast','staff_beast','rod_beast'],
   },
   cherubim: {
     name:'智天使', hp:215, maxhp:215, atk:16, def:10, mov:2, rng:2,
@@ -3608,7 +3625,7 @@ function startBattle(isBoss, midbossKey){
       name:u.name, cls:u.cls, sprite:sp, side:'ally',
       maxhp:s.maxhp, hp:Math.min(u.hp,s.maxhp),
       maxmp:s.maxmp, mp:Math.min(clampMp(u), s.maxmp),
-      atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, critRate:s.critRate,
+      atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, angelSlay:s.angelSlay, critRate:s.critRate,
       ref:u,
       x:startCols[i%3], y:BH_-2, acted:false, col:'#2ef0d0', alive:true
     });
@@ -3625,7 +3642,7 @@ function startBattle(isBoss, midbossKey){
         name:c.name, cls:c.cls, sprite:c.sprite, side:'ally',
         maxhp:s.maxhp, hp:Math.min(c.hp,s.maxhp),
         maxmp:s.maxmp, mp:Math.min(clampMp(c), s.maxmp),
-        atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, critRate:compCrit,
+        atk:s.atk, def:s.def, mov:s.mov, rng:s.rng, spell:s.spell, spells:s.spells, slayMult:s.slayMult, angelSlay:s.angelSlay, critRate:compCrit,
         beastSlay:h.beastSlay,        // 動物特効（狩人）
         counterRate:h.counterRate,    // 反撃（侍）
         musou:h.musou,                // 無双（侍）
@@ -4120,10 +4137,11 @@ function castSpell(target){
       return;
     }
     // 各敵へのダメージを先に確定（途中で敵が倒れても全員に飛ぶ）
-    const hits=foes.map(f=>({
-      enemy:f,
-      dmg:Math.max(1, sp.pow - Math.floor(f.def/2) + Math.floor(Math.random()*5-2))
-    }));
+    const hits=foes.map(f=>{
+      let pw=sp.pow;
+      if(caster.angelSlay && caster.angelSlay>1 && ANGEL_SPRITES.has(f.sprite)) pw=Math.round(pw*caster.angelSlay);
+      return {enemy:f, dmg:Math.max(1, pw - Math.floor(f.def/2) + Math.floor(Math.random()*5-2))};
+    });
     // 順次発射。間隔を短めにして連続感を出す
     let i=0;
     const fireNext=()=>{
@@ -4231,6 +4249,11 @@ function castSpell(target){
   if(sp.slayMult && sp.slayMult>1){
     const isDragon = target.sprite==='dragon' || target.sprite==='blackDragon' || target.sprite==='goldenDragon';
     if(isDragon){ spPow=Math.round(spPow*sp.slayMult); slaySpellFlash=true; }
+  }
+  /* 天使特効は術者の得物から来る（獣の杖・獣の錫杖）。
+     杖を持つのは魔法で戦う者なので、物理にしか効かないと二本が死に装備になる。 */
+  if(caster.angelSlay && caster.angelSlay>1 && ANGEL_SPRITES.has(target.sprite)){
+    spPow=Math.round(spPow*caster.angelSlay); slaySpellFlash=true;
   }
   const dmg=Math.max(1, spPow - Math.floor(target.def/2) + Math.floor(Math.random()*5-2));
   elHint.textContent=`${caster.name} の${sp.name}！`;
@@ -4625,6 +4648,11 @@ function damage(attacker,target){
     const isDragon = target.sprite==='dragon' || target.sprite==='blackDragon' || target.sprite==='goldenDragon';
     if(isDragon){ atk = Math.round(atk * attacker.slayMult); slayFlash=true; }
   }
+  // 天使特効（獣の三種）
+  let angelFlash=false;
+  if(attacker.angelSlay && attacker.angelSlay>1 && ANGEL_SPRITES.has(target.sprite)){
+    atk = Math.round(atk * attacker.angelSlay); angelFlash=true;
+  }
   // 狩人の動物特効
   if(attacker.beastSlay && attacker.beastSlay>1 && BEAST_SPRITES.has(target.sprite)){
     atk = Math.round(atk * attacker.beastSlay); beastFlash=true;
@@ -4645,6 +4673,7 @@ function damage(attacker,target){
     else msg=`${attacker.name} の会心の一撃！ ${target.name} に ${dmg} ダメージ`;
   }
   else if(slayFlash) msg=`${attacker.name} の竜断ち！ ${target.name} に ${dmg} ダメージ`;
+  else if(angelFlash) msg=`${attacker.name} の獣断ち！ ${target.name} に ${dmg} ダメージ`;
   else if(beastFlash) msg=`${attacker.name} の狙い澄ました矢！ ${target.name} に ${dmg} ダメージ`;
   if(target.hp<=0){ target.hp=0; target.alive=false; msg+=` ── ${target.name} を倒した！`; setTimeout(()=>SFX.fall(), 200); }
   elHint.textContent=msg;
@@ -5491,6 +5520,13 @@ function endBattle(win){
         const drop = (foe.boss||foe.midboss) ? 'elixir' : 'herb';
         addItem(drop); got.push(drop);
       }
+      // 確定で渡す装備（未入手のものだけ）。抽選ではないので必ず手に入る
+      if(foe.fixedDrops){
+        foe.fixedDrops.forEach(k=>{
+          const have = inventory[k] || party.some(m=>m.equip.weapon===k || m.equip.armor===k);
+          if(!have){ addItem(k); got.push(k); }
+        });
+      }
       // キーアイテム抽選（中ボス等が固有で持つ）
       if(foe.keyItemDrop){
         Object.keys(foe.keyItemDrop).forEach(kk=>{
@@ -5752,6 +5788,8 @@ function equipOptions(member, slot){
     if(mods.def) parts.push('防'+(mods.def>0?'+':'')+mods.def);
     if(mods.spellPow) parts.push((member.spellBase&&member.spellBase.type==='heal'?'回':'魔')+'+'+mods.spellPow);
     if(mods.spellRadius) parts.push('射+'+mods.spellRadius);
+    if(e.slayMult>1) parts.push('竜特効');
+    if(e.angelSlay>1) parts.push('天使特効');
     const tag=e.relic?'◆ ':'';
     // 在庫数（装備中以外）を表示
     const stock = (!isEquipped && owned) ? `（所持${inventory[key]}）` : (isEquipped?'（装備中）':'');
@@ -6116,6 +6154,7 @@ function renderShop(){
     Object.keys(EQUIP).forEach(key=>{
       const e=EQUIP[key];
       if(e.relic) return;                 // 遺物は売買不可
+      if(!(e.price>0)) return;            // price:0 は戦利品専用。店には出さない
       if(!party.some(m=>canEquip(m.cls,key))) return;
       const mods=e.mods||{};
       const parts=[];
@@ -6123,6 +6162,8 @@ function renderShop(){
       if(mods.def) parts.push(`防+${mods.def}`);
       if(mods.spellPow) parts.push(`魔/回+${mods.spellPow}`);
       if(mods.spellRadius) parts.push(`射+${mods.spellRadius}`);
+      if(e.slayMult>1) parts.push('竜特効');
+      if(e.angelSlay>1) parts.push('天使特効');
       const row=document.createElement('div'); row.className='shop-item';
       row.innerHTML=`
         <div class="si-info">
