@@ -1185,6 +1185,15 @@ const SFX={
     noise({dur:0.4, vol:0.12, hpf:300, lpf:3000});
     setTimeout(()=>tone({f:520, f2:180, dur:0.18, type:'triangle', vol:0.12}),120);
   },
+  beam:    ()=>{ // 光条：澄んだ音が張り詰めてから、鋭く抜ける
+    // 溜めの 450ms は beamFx の照準フレーム（10×45ms）に合わせてある
+    tone({f:420, f2:1400, dur:0.45, type:'sine', vol:0.07});
+    setTimeout(()=>{
+      tone({f:2400, f2:900, dur:0.22, type:'triangle', vol:0.13});
+      tone({f:1200, f2:400, dur:0.26, type:'sine', vol:0.09});
+      noise({dur:0.18, vol:0.07, hpf:2500, lpf:9000});
+    }, 450);
+  },
   heal:    ()=>{ // 癒し：柔らかいベル和音
     tone({f:660, dur:0.5, type:'sine', vol:0.10});
     setTimeout(()=>tone({f:880, dur:0.5, type:'sine', vol:0.08}),80);
@@ -3344,7 +3353,7 @@ const ENEMY_POOL=[
     counterRate:0.35},          // 剣を構えている。迂闊に殴ると返ってくる
   {name:'力天使', hp:44,maxhp:44,atk:15,def:9, mov:4,rng:1,col:'#c8dcc0',sprite:'virtues', rank:3, sky:true},
   {name:'主天使', hp:40,maxhp:40,atk:13,def:8, mov:2,rng:3,col:'#c0d0e8',sprite:'dominions', rank:3, sky:true,
-    spell:{name:'聖句', type:'damage', pow:20, radius:4}},
+    spell:{name:'聖句', type:'damage', pow:20, radius:4, fx:'beam'}},
 ];
 
 // 階層別の出現テーブル（B1=index0 …）。深いほど強い敵が増える。
@@ -3425,7 +3434,7 @@ const GOLDEN_DRAGON={
 const ANGEL={
   name:'熾天使', hp:520, maxhp:520, atk:26, def:13, mov:2, rng:3,
   col:'#f2c0a0', sprite:'seraphim', rank:3, boss:true, goldRange:[1200,1500],
-  spell:{name:'審判の光', type:'breath', pow:46, radius:5},
+  spell:{name:'審判の光', type:'breath', pow:46, radius:5, fx:'beam'},
   dropTable:{ relic:1.0 },
   multiAttack:3,
   exp:400,
@@ -3466,7 +3475,7 @@ const MIDBOSSES={
     name:'座天使', hp:175, maxhp:175, atk:17, def:9, mov:2, rng:3,
     sprite:'thrones', rank:3, midboss:true, scale:2.6, exp:150, goldRange:[220,300],
     // 輪だけの姿で歩かない。射程3から動かずに焼く
-    spell:{name:'無数の眼', type:'damage', pow:17, radius:4},
+    spell:{name:'無数の眼', type:'damage', pow:17, radius:4, fx:'beam'},
     dropTable:{ rare:0.45, epic:0.50 },
     // 天蓋の最初の番人。獣の三種をここで渡さないと、この先が通れない
     fixedDrops:['sword_beast','staff_beast','rod_beast'],
@@ -3474,7 +3483,7 @@ const MIDBOSSES={
   cherubim: {
     name:'智天使', hp:215, maxhp:215, atk:16, def:10, mov:2, rng:2,
     sprite:'cherubim', rank:3, midboss:true, scale:2.6, exp:220, goldRange:[320,420],
-    spell:{name:'四つの貌', type:'breath', pow:16, radius:4},
+    spell:{name:'四つの貌', type:'breath', pow:16, radius:4, fx:'beam'},
     multiAttack:2,          // 一撃は座天使より軽いが、四つの貌がそれぞれ動く
     dropTable:{ epic:0.60, relic:0.35 },
   },
@@ -4406,6 +4415,137 @@ function breathFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
     }
   },45);
 }
+/* ===== 光条（天蓋の術者用） =====
+   炎は「噴き出して届く」ものなので、玉や扇で表すと時間の流れが出る。
+   光は逆に「一瞬で通る」ので、同じ作りにすると遅い光になってしまう。
+   そこで、溜め（照準）を長めに取り、通る瞬間は1〜2フレームで白く抜き、
+   あとは残光だけを引かせる。届くまでの経過ではなく、通った痕跡で見せる。
+
+   色について：天蓋の盤は白い。白い光をそのまま乗せると、とくに溜めの段階が
+   地に溶けて何も起きていないように見える（実際そうなった）。芯は白のまま、
+   縁と照準には濃い藍を差して輪郭を作っている。藍は白い盤でも暗い盤でも沈まない。
+
+   引数と呼び出し方は breathFx / fireballFx と揃えてある。 */
+function beamFx(gx0, gy0, gx1, gy1, onImpact, onEnd){
+  const x0=BOFFX+gx0*TILE+TILE/2;
+  const y0=BOFFY+gy0*TILE-TILE*0.35;   // 術者の手元〜胸元あたりから出す
+  const x1=BOFFX+gx1*TILE+TILE/2, y1=BOFFY+gy1*TILE+TILE/2;
+  const aimFrames=10;   // 照準。光条は一瞬なので、ここで「来る」と分からせる
+  const fireFrames=3;   // 貫く瞬間
+  const glowFrames=9;   // 残光
+  const totalFrames=aimFrames+fireFrames+glowFrames;
+  const dx=x1-x0, dy=y1-y0;
+  const dist=Math.hypot(dx,dy) || 1;
+  const nx=dx/dist, ny=dy/dist;
+  const px=-ny, py=nx;                  // 光条に垂直な向き
+  let frame=0, impacted=false;
+
+  const iv=fxSetInterval(()=>{
+    drawBattle();
+    bctx.save();
+    if(frame<aimFrames){
+      const t=frame/aimFrames;
+      // 手元に光が収束する。外から内へ集まる粒で「溜め」を見せる
+      const r=TILE*0.34*(1-t*0.5);
+      const g=bctx.createRadialGradient(x0,y0,0,x0,y0,Math.max(1,r));
+      g.addColorStop(0,`rgba(255,255,255,${0.55+t*0.4})`);
+      g.addColorStop(0.42,`rgba(150,165,250,${0.45+t*0.4})`);
+      g.addColorStop(1,'rgba(60,70,170,0)');
+      bctx.fillStyle=g;
+      bctx.beginPath(); bctx.arc(x0,y0,Math.max(1,r),0,Math.PI*2); bctx.fill();
+      // 外から内へ集まる粒。藍にして、術者の明るい絵の上でも見えるようにする
+      for(let i=0;i<6;i++){
+        const ang=(i/6)*Math.PI*2 + t*2.2;
+        const sd=TILE*0.70*(1-t);
+        bctx.fillStyle=`rgba(70,90,210,${0.35+t*0.55})`;
+        bctx.fillRect(x0+Math.cos(ang)*sd-1.5, y0+Math.sin(ang)*sd-1.5, 3, 3);
+      }
+      // 照準線。どこを撃つのかを先に示す
+      bctx.strokeStyle=`rgba(70,90,205,${0.22+t*0.42})`;
+      bctx.lineWidth=1.5;
+      bctx.setLineDash([5, 7]);
+      bctx.lineDashOffset=-frame*4;
+      bctx.beginPath(); bctx.moveTo(x0,y0); bctx.lineTo(x1,y1); bctx.stroke();
+      bctx.setLineDash([]);
+      // 着弾点の環。二重にして、白い床でも輪郭が出るようにする
+      const mr=TILE*(0.40-0.18*t);
+      bctx.strokeStyle=`rgba(55,70,190,${0.40+t*0.50})`;
+      bctx.lineWidth=Math.max(2, TILE*0.055);
+      bctx.beginPath(); bctx.arc(x1,y1,Math.max(2,mr),0,Math.PI*2); bctx.stroke();
+      bctx.strokeStyle=`rgba(255,255,255,${0.30+t*0.5})`;
+      bctx.lineWidth=1;
+      bctx.beginPath(); bctx.arc(x1,y1,Math.max(1,mr*0.58),0,Math.PI*2); bctx.stroke();
+    }else if(frame<aimFrames+fireFrames){
+      const t=(frame-aimFrames)/fireFrames;       // 0..1
+      const w=TILE*0.30*(1-t*0.62);               // 通った直後がいちばん太い
+      // 外側の滲み → 内側の芯、の順に重ねる
+      bctx.globalCompositeOperation='lighter';
+      const layers=[[w*2.6,'rgba(70,95,225,0.30)'],
+                    [w*1.5, 'rgba(130,160,255,0.45)'],
+                    [w*0.8, 'rgba(235,242,255,0.85)'],
+                    [w*0.32,'rgba(255,255,255,1.00)']];
+      layers.forEach(([lw,col])=>{
+        bctx.strokeStyle=col; bctx.lineWidth=Math.max(1,lw); bctx.lineCap='round';
+        bctx.beginPath(); bctx.moveTo(x0,y0); bctx.lineTo(x1,y1); bctx.stroke();
+      });
+      // 光条に沿って走る細い羽根。まっすぐな線だけだと硬いので、左右に薄く添える
+      for(const side of [-1,1]){
+        bctx.strokeStyle=`rgba(120,150,250,${0.30*(1-t)})`;
+        bctx.lineWidth=1;
+        bctx.beginPath();
+        for(let i=0;i<=10;i++){
+          const s=i/10;
+          const spread=Math.sin(s*Math.PI)*TILE*0.22*side;
+          const sx=x0+nx*dist*s+px*spread, sy=y0+ny*dist*s+py*spread;
+          if(i===0) bctx.moveTo(sx,sy); else bctx.lineTo(sx,sy);
+        }
+        bctx.stroke();
+      }
+      // 着弾の白熱
+      const fr=TILE*(0.45+t*0.45);
+      const fg=bctx.createRadialGradient(x1,y1,0,x1,y1,fr);
+      fg.addColorStop(0,`rgba(255,255,255,${0.95-t*0.3})`);
+      fg.addColorStop(0.38,`rgba(170,195,255,${0.65-t*0.25})`);
+      fg.addColorStop(1,'rgba(60,80,200,0)');
+      bctx.fillStyle=fg;
+      bctx.beginPath(); bctx.arc(x1,y1,fr,0,Math.PI*2); bctx.fill();
+      bctx.globalCompositeOperation='source-over';
+      if(!impacted){ impacted=true; if(onImpact) onImpact(); SFX.hit(); }
+    }else{
+      // 残光：光条が細く薄れ、着弾点から粒が立ち昇る
+      const t=(frame-aimFrames-fireFrames)/glowFrames;
+      const a=Math.max(0, 0.55*(1-t));
+      bctx.globalCompositeOperation='lighter';
+      bctx.strokeStyle=`rgba(120,150,250,${a*0.65})`;
+      bctx.lineWidth=Math.max(1, TILE*0.07*(1-t));
+      bctx.beginPath(); bctx.moveTo(x0,y0); bctx.lineTo(x1,y1); bctx.stroke();
+      const r=TILE*(0.42+t*0.5);
+      const g=bctx.createRadialGradient(x1,y1,0,x1,y1,r);
+      g.addColorStop(0,`rgba(255,255,255,${a*0.85})`);
+      g.addColorStop(0.42,`rgba(150,175,255,${a*0.5})`);
+      g.addColorStop(1,'rgba(60,80,200,0)');
+      bctx.fillStyle=g;
+      bctx.beginPath(); bctx.arc(x1,y1,r,0,Math.PI*2); bctx.fill();
+      for(let i=0;i<7;i++){
+        const ang=(i/7)*Math.PI*2 + t*0.8;
+        const sd=TILE*(0.3+t*0.75);
+        const sx=x1+Math.cos(ang)*sd*0.55;
+        const sy=y1+Math.sin(ang)*sd*0.55 - t*TILE*0.55;   // 上へ昇る
+        bctx.fillStyle=`rgba(110,140,245,${a*0.95})`;
+        bctx.fillRect(sx-1.5,sy-1.5,3,3);
+      }
+      bctx.globalCompositeOperation='source-over';
+    }
+    bctx.restore();
+    frame++;
+    if(frame>=totalFrames){
+      fxClearInterval(iv);
+      drawBattle();
+      if(onEnd) onEnd();
+    }
+  },45);
+}
+
 // 範囲攻撃：caster→中心へ大きな火の玉、着弾と同時に十字方向の各マスへ小さな火の玉が散る
 function aoeFireFx(gx0, gy0, gcx, gcy, area, cells, onImpact, onEnd){
   const x0=BOFFX+gx0*TILE+TILE/2, y0=BOFFY+gy0*TILE+TILE/2;
@@ -5306,8 +5446,10 @@ function enemyPhase(){
           const target=inRange[Math.floor(Math.random()*inRange.length)];
           const dmg=Math.max(1, f.spell.pow - Math.floor(target.def/2) + Math.floor(Math.random()*5-2));
           elHint.textContent=`${f.name} の${f.spell.name}！`;
-          const fx = (f.spell.type==='breath') ? breathFx : fireballFx;
-          if(f.spell.type==='breath') SFX.fire(); else SFX.fire();
+          // fx:'beam' を持つ魔法は光条で描く（天蓋の術者はすべてこれ）
+          const isBeam = f.spell.fx==='beam';
+          const fx = isBeam ? beamFx : (f.spell.type==='breath' ? breathFx : fireballFx);
+          if(isBeam) SFX.beam(); else SFX.fire();
           fx(f.x, f.y, target.x, target.y, ()=>{
             target.hp-=dmg;
             spawnHitFx(target, dmg, 'dmg');
