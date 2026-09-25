@@ -388,6 +388,7 @@
   #chestArt.on{ display:flex; }
   #chestArt img{
     width:46%; max-width:260px; height:auto; display:block;
+    user-select:none; -webkit-user-select:none; -webkit-user-drag:none;
     border:2px solid var(--oldgold); border-radius:4px;
     box-shadow:0 0 0 1px rgba(0,0,0,.6), 0 6px 26px rgba(0,0,0,.65),
                0 0 34px rgba(230,168,72,.45);
@@ -424,6 +425,9 @@
     flex:0 0 auto; width:min(300px, 40%); height:auto;
     border:1px solid var(--paper-edge); border-radius:3px;
     box-shadow:0 4px 18px rgba(0,0,0,.55);
+    /* 本文からなぞると選択が画像まで伸び、一面が青く塗り潰される。
+       本文は引用できるよう選べるままにして、画像だけ対象から外す。 */
+    user-select:none; -webkit-user-select:none; -webkit-user-drag:none;
   }
   #tabletWin .tw-body{
     flex:1 1 auto; display:flex; flex-direction:column; justify-content:center;
@@ -512,6 +516,7 @@
   #endPicture img{
     display:block; max-width:min(1024px,92vw); max-height:64vh;
     width:auto; height:auto;
+    user-select:none; -webkit-user-select:none; -webkit-user-drag:none;
     box-shadow:0 0 60px rgba(0,0,0,.9);
   }
   /* 変貌を三分割で現す。左から順に覆いを外す。
